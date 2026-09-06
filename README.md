@@ -19,8 +19,8 @@ sudo apt update && sudo apt install -y ansible git
 ansible-pull -U https://github.com/HalcoDraco/ubuntu-autoinstall.git -K local.yml
 ```
 
-Or, if you would rather clone first (recommended — it is easier to inspect
-before it runs, and `bootstrap.sh` installs dependencies explicitly):
+Or, preferred — `bootstrap.sh` works on any machine, new or already set up,
+and installs dependencies explicitly:
 
 ```bash
 sudo apt update && sudo apt install -y git
@@ -35,12 +35,23 @@ cd ubuntu-autoinstall && ./bootstrap.sh
 Everyday use, once cloned:
 
 ```bash
+./bootstrap.sh --check --diff    # dry run, works on any machine
+./bootstrap.sh                   # apply
+```
+
+After the first run, `make` is installed and these shortcuts work too:
+
+```bash
 make            # list every target
-make check      # dry run: show what WOULD change, change nothing
-make run        # apply
+make check      # same as ./bootstrap.sh --check --diff
+make run        # same as ./bootstrap.sh
 make run-tags TAGS=keyboard      # apply one part only
 make lint       # ansible-lint, production profile
 ```
+
+> **Why two ways?** `make` is *not* installed on a fresh Ubuntu, so `make run`
+> cannot work on a brand-new machine. `bootstrap.sh` needs only bash and apt.
+> The playbook installs `make`, so the shortcuts work from then on.
 
 ---
 
@@ -134,17 +145,16 @@ it is a list entry too — the same test, applied consistently.
 
 ## 4. Per-machine differences
 
-One playbook, different variables — never a forked playbook.
+**Usually there are none.** The playbook detects an NVIDIA GPU by reading the
+PCI bus in `local.yml`'s `pre_tasks`, so one configuration covers every
+machine: a desktop with a card installs the driver and GPU-container support,
+a laptop without one skips both. No per-machine file, no forked playbook.
 
-```
-host_vars/
-├── Niaura-linux.yml       # the desktop: nvidia_gpu_present: true
-├── example-laptop.yml     # TEMPLATE — rename to the laptop's `hostname`
-└── default.yml            # fallback for any machine with no file of its own
-```
-
-To onboard the laptop: run `hostname` on it, rename `example-laptop.yml` to
-exactly that, commit.
+`host_vars/` still exists for the rare case where one machine must genuinely
+differ (say, no Docker on the laptop). Create `host_vars/<hostname>.yml` and
+put the overrides there; anything not overridden comes from
+`group_vars/all.yml`. With no file, `host_vars/default.yml` is used, and it is
+deliberately empty.
 
 ### Why the inventory is just `localhost`
 

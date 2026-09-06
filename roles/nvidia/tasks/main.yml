@@ -5,10 +5,11 @@
 # THIS ROLE IS DELIBERATELY THE MOST CAUTIOUS IN THE REPO. A wrong driver
 # install can leave a machine without a working display or, with Secure Boot
 # on, without a loadable kernel module. So it refuses to act unless three
-# independent things all agree:
+# things all agree:
 #
-#   1. host_vars says this machine has an NVIDIA GPU  (gate in local.yml)
-#   2. an NVIDIA device is actually present on the PCI bus
+#   1. an NVIDIA device is actually present on the PCI bus (detected in
+#      local.yml's pre_tasks, so every role shares one answer)
+#   2. nvidia_gpu_present has not been switched off for this machine
 #   3. no working driver is already installed
 #
 # WHY `ubuntu-drivers install` AND NOT nvidia-driver-XXX:
@@ -16,21 +17,6 @@
 # nvidia-driver-550 is wrong by the next release. ubuntu-drivers asks Ubuntu
 # which driver suits THIS card on THIS kernel, so it stays correct forever.
 # ===========================================================================
-
-- name: Look for an NVIDIA GPU on the PCI bus
-  # Independent hardware check, so a mistaken host variable cannot cause a
-  # driver install on a machine with no NVIDIA card.
-  #
-  # Reading /proc/bus/pci/devices avoids depending on lspci being installed
-  # (it is not, on a minimal install). Vendor 10de is NVIDIA.
-  ansible.builtin.shell:
-    cmd: "set -o pipefail; awk '{print $2}' /proc/bus/pci/devices | grep -qi '^{{ nvidia_pci_vendor_id }}' && echo present || echo absent"
-    executable: /bin/bash
-  register: nvidia_pci
-  changed_when: false     # a query never changes anything
-  check_mode: false       # still run during --check; it only reads
-  failed_when: false      # "no GPU" is an answer, not an error
-  tags: [nvidia]
 
 - name: Check whether a working NVIDIA driver is already installed
   # Your requirement: skip if a suitable driver is already present. If
@@ -46,7 +32,6 @@
 
 - name: Summarise what was detected
   ansible.builtin.set_fact:
-    nvidia_hardware_present: "{{ (nvidia_pci.stdout | default('absent')) is search('present') }}"
     nvidia_driver_working: "{{ nvidia_smi.rc | default(1) == 0 }}"
   tags: [nvidia]
 

@@ -1,11 +1,19 @@
 ---
 # ---------------------------------------------------------------------------
-# Fallback variables for a machine with no host_vars file of its own.
+# Fallback variables, used on any machine without a host_vars file of its own.
 #
-# local.yml loads host_vars/<hostname>.yml if it exists, otherwise this file.
-# That means a brand-new machine -- whatever you named it in the installer --
-# gets a safe, conservative configuration instead of silently doing nothing.
+# YOU NORMALLY DO NOT NEED PER-MACHINE FILES AT ALL. The playbook detects an
+# NVIDIA GPU by looking at the PCI bus, so one configuration works on every
+# machine: a desktop with a card gets the driver, a laptop without one skips
+# it. Everything else lives in group_vars/all.yml and applies everywhere.
 #
-# Conservative here means: no GPU driver. A machine must explicitly opt in.
+# If you ever DO want one machine to differ, create
+# host_vars/<hostname>.yml (run `hostname` to get the name) and put the
+# overrides there. For example:
+#
+#     install_docker: false
+#     nvidia_gpu_present: false   # has a card, but do not install the driver
+#
+# This file exists so that lookup always finds something. Keep it empty.
 # ---------------------------------------------------------------------------
-nvidia_gpu_present: false
+{}

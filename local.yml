@@ -74,12 +74,35 @@
           - "host_vars/default.yml"
       tags: [always]
 
+    - name: Detect whether an NVIDIA GPU is physically present
+      # Asking the hardware directly, so the same settings work on every
+      # machine: a desktop with a card installs the driver, a laptop without
+      # one skips it, and neither needs a per-machine file.
+      #
+      # /proc/bus/pci/devices rather than lspci, because lspci is not
+      # installed on a minimal Ubuntu. Vendor 10de is NVIDIA.
+      ansible.builtin.shell:
+        cmd: "set -o pipefail; awk '{print $2}' /proc/bus/pci/devices | grep -qi '^{{ nvidia_pci_vendor_id }}' && echo present || echo absent"
+        executable: /bin/bash
+      register: nvidia_pci_probe
+      changed_when: false     # a query changes nothing
+      check_mode: false       # safe during --check; it only reads
+      failed_when: false      # "no GPU" is an answer, not an error
+      tags: [always]
+
+    - name: Record whether NVIDIA hardware was found
+      ansible.builtin.set_fact:
+        nvidia_hardware_present: "{{ (nvidia_pci_probe.stdout | default('absent')) is search('present') }}"
+      tags: [always]
+
     - name: Report which variable file was used
       ansible.builtin.debug:
         msg: >-
-          Host '{{ ansible_facts['hostname'] }}' -- NVIDIA expected:
-          {{ nvidia_gpu_present }}. Edit host_vars/{{ ansible_facts['hostname'] }}.yml
-          to change settings for this machine only.
+          Host '{{ ansible_facts['hostname'] }}' --
+          NVIDIA GPU detected: {{ nvidia_hardware_present }}
+          (NVIDIA roles {{ 'will run' if (nvidia_hardware_present | bool and nvidia_gpu_present | bool) else 'will be skipped' }}).
+          Per-machine overrides are optional: drop them in
+          host_vars/{{ ansible_facts['hostname'] }}.yml if you ever need them.
       tags: [always]
 
   roles:
@@ -104,10 +127,12 @@
 
     - role: nvidia
       tags: [nvidia]
-      # Two guards, on purpose. The host variable expresses intent ("this
-      # machine has a GPU"); the role itself additionally verifies the
-      # hardware really is there before touching drivers.
-      when: nvidia_gpu_present | bool
+      # Hardware detection decides, so one configuration works on every
+      # machine. nvidia_gpu_present is only an off switch for a machine that
+      # has a card but should not get the proprietary driver.
+      when:
+        - nvidia_gpu_present | bool
+        - nvidia_hardware_present | bool
 
     # GPU containers. Only meaningful when BOTH Docker and an NVIDIA GPU are
     # present, which is why it is its own role rather than living inside
@@ -118,6 +143,7 @@
       when:
         - install_docker | bool
         - nvidia_gpu_present | bool
+        - nvidia_hardware_present | bool
         - install_nvidia_container | bool
 
     - role: mise

@@ -14,4 +14,5 @@ base_packages:
   - curl              # used to fetch repo signing keys
   - gnupg             # used to handle those keys
   - git               # ansible-pull needs it; also generally essential
+  - make              # NOT installed on a fresh Ubuntu; the Makefile needs it
   - python3-psutil    # community.general.dconf uses it to find your D-Bus session

@@ -62,11 +62,16 @@ install_nvidia_container: true
 install_mise: true
 configure_keyboard: true
 
-# NVIDIA is driven by a host variable, never auto-enabled globally:
-# the laptop must skip it entirely. Default is false so an UNKNOWN machine
-# never tries to install a GPU driver it does not need.
-# host_vars/Niaura-linux.yml sets this to true.
-nvidia_gpu_present: false
+# NVIDIA support. Left ON for every machine on purpose: the playbook checks
+# the PCI bus itself, so a machine with a card gets the driver and a machine
+# without one skips it automatically. You do NOT need a per-machine file.
+#
+# Set this to false only to stop a machine that HAS an NVIDIA card from
+# getting the proprietary driver.
+nvidia_gpu_present: true
+
+# Vendor ID 10de is NVIDIA, used for the hardware check in local.yml.
+nvidia_pci_vendor_id: "10de"
 
 # ---------------------------------------------------------------------------
 # KEYBOARD

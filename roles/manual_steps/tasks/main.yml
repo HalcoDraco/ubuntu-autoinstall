@@ -39,7 +39,8 @@
   vars:
     manual_steps_header:
       - "==========================================================="
-      - " MANUAL STEPS -- these cannot be automated"
+      - " MANUAL STEPS -- everything below needs YOU"
+      - " Nothing here can be scripted. The playbook has done all it can."
       - "==========================================================="
       - ""
 
@@ -54,6 +55,17 @@
       - "   Open Chrome > Sign in > enable sync."
       - "   Why not automated: same OAuth consent flow, plus Chrome binds the"
       - "   profile to your login keyring on first run."
+      - ""
+      - "* SPOTIFY -- SIGN IN"
+      - "   Open Spotify and log in."
+      - "   Why not automated: the login is an interactive web flow and the"
+      - "   session token is stored per-user after you authenticate."
+      - ""
+      - "* SSH / GPG KEYS -- COPY THEM ACROSS YOURSELF"
+      - "   ~/.ssh and ~/.gnupg are NOT managed by this repo and are NOT in"
+      - "   git. Restore them from your backup, then: chmod 700 ~/.ssh and"
+      - "   chmod 600 ~/.ssh/id_*"
+      - "   Why not automated: private keys must never live in a git repo."
       - ""
       - "* KEYBOARD LAYOUT -- LOG OUT AND BACK IN"
       - "   The custom layout is installed, and GNOME is pointed at it, but"
@@ -127,6 +139,10 @@
 
     manual_steps_footer:
       - "-----------------------------------------------------------"
+      - >-
+        NVIDIA GPU detected: {{ nvidia_hardware_present | default(false) }}
+        -- driver/GPU-container steps
+        {{ 'ran' if (nvidia_hardware_present | default(false) | bool) else 'were skipped (no card found)' }}.
       - "NOTE: Firefox was deliberately left untouched by this playbook."
       - "==========================================================="
   tags: [manual_steps]

@@ -6,7 +6,10 @@ Everything you normally need. For the *why*, see [README.md](README.md).
 
 ## Run it
 
-**On a brand-new machine:**
+`./bootstrap.sh` always works — new machine or old, it is the only command
+you need to remember.
+
+**First time on a machine:**
 
 ```bash
 sudo apt update && sudo apt install -y git
@@ -14,16 +17,20 @@ git clone https://github.com/HalcoDraco/ubuntu-autoinstall.git
 cd ubuntu-autoinstall && ./bootstrap.sh
 ```
 
-**On a machine that already has it:**
+**Every time after that:**
 
 ```bash
 cd ~/Documents/ubuntu-autoinstall
 git pull
-make check    # dry run - changes nothing
-make run      # apply
+./bootstrap.sh --check --diff    # dry run - changes nothing
+./bootstrap.sh                   # apply
 ```
 
-Never use `sudo make run`. Run it as yourself; it asks for your password.
+Once it has run once, `make check` and `make run` do the same thing with less
+typing. They only work *after* the first run, because `make` is not installed
+on a fresh Ubuntu — that is the only difference between them.
+
+Never use `sudo ./bootstrap.sh`. Run it as yourself; it asks for your password.
 
 **Afterwards:** log out and back in (keyboard, docker group), and open a new
 terminal (`java`).
@@ -95,16 +102,32 @@ Then `make run` **and log out and back in** — GNOME only reads the layout at l
 
 ---
 
-## Settings for one machine only
+## Machines with and without an NVIDIA card
 
-Create `host_vars/<hostname>.yml` (run `hostname` to get the name):
+**Nothing to do.** The playbook checks the PCI bus itself: a machine with a
+card gets the driver and GPU-container support, a machine without one skips
+both. The same configuration works everywhere.
 
-```yaml
-nvidia_gpu_present: true     # false, or omit, if no NVIDIA card
-install_docker: false        # example: skip docker on this machine
+The run tells you which happened:
+
+```
+NVIDIA GPU detected: True  (NVIDIA roles will run)
+NVIDIA GPU detected: False (NVIDIA roles will be skipped)
 ```
 
-No file for a machine? It uses `host_vars/default.yml` — safe defaults, no GPU.
+To stop a machine that *has* a card from getting the proprietary driver, set
+`nvidia_gpu_present: false`.
+
+## Settings for one machine only (rarely needed)
+
+Create `host_vars/<hostname>.yml` (run `hostname` for the name):
+
+```yaml
+install_docker: false     # example: skip docker on this machine
+```
+
+No file? It falls back to `host_vars/default.yml`, which is empty — so
+`group_vars/all.yml` applies everywhere. That is the normal case.
 
 ---
 
