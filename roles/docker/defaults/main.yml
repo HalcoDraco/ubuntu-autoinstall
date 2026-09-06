@@ -1,7 +1,7 @@
 ---
 # Docker's official APT repository. This one DOES need the Ubuntu codename,
 # which is exactly why it is written as a variable and never as a literal:
-#   suites: "{{ ansible_distribution_release }}"
+#   suites: "{{ ansible_facts['distribution_release'] }}"
 # On noble that resolves to "noble"; on 26.04 it resolves to that release's
 # codename with no edit to this repo.
 docker_repo_uri: "https://download.docker.com/linux/ubuntu"
@@ -15,4 +15,4 @@ docker_packages:
   - docker-compose-plugin
 # The user to add to the "docker" group. Defaults to whoever is running the
 # playbook, which under ansible-pull is you, not root.
-docker_user: "{{ ansible_user_id }}"
+docker_user: "{{ ansible_facts['user_id'] }}"

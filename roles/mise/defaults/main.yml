@@ -8,4 +8,4 @@ mise_repo_component: "main"
 mise_signing_key_url: "https://mise.jdx.dev/gpg-key.pub"
 mise_keyring_path: "/etc/apt/keyrings/mise.asc"
 # Where mise puts the shims that make `java` resolve.
-mise_shims_path: "{{ ansible_env.HOME }}/.local/share/mise/shims"
+mise_shims_path: "{{ ansible_facts['env'].HOME }}/.local/share/mise/shims"

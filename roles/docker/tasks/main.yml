@@ -4,7 +4,9 @@
 #
 # PLANNED IMPLEMENTATION (hand-rolled, ~40 lines):
 #   1. get_url  Docker's GPG key -> {{ docker_keyring_path }}
-#   2. deb822_repository with suites: "{{ ansible_distribution_release }}"
+#   2. template a .sources file with
+#      Suites: {{ ansible_facts['distribution_release'] }}
+#      (template, not deb822_repository -- see roles/chrome for why)
 #   3. apt install {{ docker_packages }}
 #   4. systemd: enable + start docker
 #   5. user: append the invoking user to the "docker" group

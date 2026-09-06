@@ -32,9 +32,15 @@ briefly why in a comment — that is an explicit requirement, not a nicety.
    format on every version. Do not "modernise" this back to a module.
 6b. **Use only Ansible features present in 2.10.** That is the floor set by
    22.04. Check before using anything newer.
-7. **Do not touch Firefox.** Not installing, not removing, not configuring.
+7. **Always access facts as `ansible_facts['name']`, never as the bare
+   `ansible_name` variable.** Ubuntu 26.04 ships ansible-core 2.20, which
+   deprecates `INJECT_FACTS_AS_VARS`; the top-level `ansible_distribution`
+   style variables are removed in core 2.24. The `ansible_facts` dict form
+   works all the way back to 2.10, so it is both backward and forward safe.
+   This was caught by an actual deprecation warning on a 26.04 test run.
+8. **Do not touch Firefox.** Not installing, not removing, not configuring.
    The user changed their mind on this; leave it alone entirely.
-8. **Ubuntu only.** Distro-agnosticism is explicitly *not* wanted — but keep
+9. **Ubuntu only.** Distro-agnosticism is explicitly *not* wanted — but keep
    package installs isolated in roles so the package layer could be swapped
    without a rewrite.
 

@@ -172,6 +172,7 @@ Hard rules for this repo. Breaking one is how it rots on the next release.
 | Package names | `openjdk` via mise, `default-jdk` | `openjdk-25-jdk` |
 | Repos | Official upstream apt repos | PPAs — they break across upgrades |
 | Ansible features | Only what 22.04's ansible 2.10 has | `deb822_repository` (needs core 2.15+, absent on 22.04) |
+| Facts | `ansible_facts['distribution_release']` | `ansible_distribution_release` — removed in ansible-core 2.24 |
 | Release-specific work | `when: ansible_distribution_version is version('26.04', '>=')` | Assuming a release |
 
 ### Why repo files are written with `template`
@@ -194,6 +195,11 @@ Three of the four repos used here (Chrome, mise, Spotify's snap) have **no
 codename at all** — they publish a single `stable` suite for every Ubuntu
 release, so they cannot rot. Docker's does need the codename, which is exactly
 why it is written as the fact and never as a literal.
+
+> **Verified on 26.04.** The playbook has been run against a real Ubuntu
+> 26.04 "Resolute Raccoon" VM (APT 3.2.0, ansible-core 2.20.1): it completes
+> with zero failures, and the snap-prompting checklist entry correctly appears
+> there while staying hidden on 24.04.
 
 ### What is different about 26.04, and how it is handled
 

@@ -22,9 +22,9 @@
   # See inventory/hosts.yml for why it is built that way.
 
   gather_facts: true
-  # Collects facts about the machine (ansible_distribution_release, hostname,
+  # Collects facts about the machine (ansible_facts['distribution_release'], hostname,
   # CPU, etc.) before running anything. We depend on several of these -- most
-  # importantly ansible_distribution_release, which is how we stay
+  # importantly ansible_facts['distribution_release'], which is how we stay
   # version-agnostic instead of hardcoding "noble" or "resolute".
 
   become: false
@@ -51,12 +51,12 @@
     - name: Verify we are running on Ubuntu
       ansible.builtin.assert:
         that:
-          - ansible_distribution == "Ubuntu"
+          - ansible_facts['distribution'] == "Ubuntu"
         fail_msg: >-
           This playbook targets Ubuntu only, but this machine reports
-          '{{ ansible_distribution }}'. Refusing to continue rather than
+          '{{ ansible_facts['distribution'] }}'. Refusing to continue rather than
           guess at package names.
-        success_msg: "Ubuntu {{ ansible_distribution_version }} ({{ ansible_distribution_release }}) detected."
+        success_msg: "Ubuntu {{ ansible_facts['distribution_version'] }} ({{ ansible_facts['distribution_release'] }}) detected."
       tags: [always]
 
     - name: Load per-machine variables
@@ -70,15 +70,15 @@
         file: "{{ lookup('ansible.builtin.first_found', candidate_var_files) }}"
       vars:
         candidate_var_files:
-          - "host_vars/{{ ansible_hostname }}.yml"
+          - "host_vars/{{ ansible_facts['hostname'] }}.yml"
           - "host_vars/default.yml"
       tags: [always]
 
     - name: Report which variable file was used
       ansible.builtin.debug:
         msg: >-
-          Host '{{ ansible_hostname }}' -- NVIDIA expected:
-          {{ nvidia_gpu_present }}. Edit host_vars/{{ ansible_hostname }}.yml
+          Host '{{ ansible_facts['hostname'] }}' -- NVIDIA expected:
+          {{ nvidia_gpu_present }}. Edit host_vars/{{ ansible_facts['hostname'] }}.yml
           to change settings for this machine only.
       tags: [always]
 

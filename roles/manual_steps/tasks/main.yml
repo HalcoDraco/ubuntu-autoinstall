@@ -8,6 +8,9 @@
 # Every entry here is something that is interactive by design (OAuth consent,
 # firmware enrollment) or that needs a new login session. If you find a way to
 # automate one of these, delete it from the list.
+#
+# Entries are bulleted rather than numbered: sections are conditional, so
+# hardcoded numbers produced gaps (1, 2, 3, 5, 6) whenever one was skipped.
 # ===========================================================================
 
 - name: Check whether Secure Boot is enabled
@@ -41,18 +44,18 @@
       - ""
 
     manual_steps_always:
-      - "1. GOOGLE ACCOUNT (GNOME Online Accounts)"
+      - "* GOOGLE ACCOUNT (GNOME Online Accounts)"
       - "   Settings > Online Accounts > Google, then sign in."
       - "   Why not automated: OAuth needs an interactive browser consent"
       - "   screen and stores a token in your login keyring. There is no"
       - "   headless path, and hardcoding credentials would be worse."
       - ""
-      - "2. CHROME SYNC"
+      - "* CHROME SYNC"
       - "   Open Chrome > Sign in > enable sync."
       - "   Why not automated: same OAuth consent flow, plus Chrome binds the"
       - "   profile to your login keyring on first run."
       - ""
-      - "3. KEYBOARD LAYOUT -- LOG OUT AND BACK IN"
+      - "* KEYBOARD LAYOUT -- LOG OUT AND BACK IN"
       - "   The custom layout is installed, and GNOME is pointed at it, but"
       - "   GNOME compiles the keymap when your session STARTS. Until you log"
       - "   out and back in, the new layout will not appear in the switcher."
@@ -64,11 +67,11 @@
       {{
         (secureboot_steps if (manual_steps_secureboot_enabled | bool and nvidia_gpu_present | bool) else [])
         + (docker_steps if (install_docker | bool) else [])
-        + (snap_steps if (ansible_distribution_version is version('26.04', '>=')) else [])
+        + (snap_steps if (ansible_facts['distribution_version'] is version('26.04', '>=')) else [])
       }}
 
     secureboot_steps:
-      - "4. SECURE BOOT -- MOK ENROLLMENT (Secure Boot is ENABLED here)"
+      - "* SECURE BOOT -- MOK ENROLLMENT (Secure Boot is ENABLED here)"
       - "   If the NVIDIA driver was just installed, the DKMS kernel module"
       - "   is unsigned and Secure Boot will refuse to load it."
       - "   You will be asked to set a one-time password during install, then"
@@ -79,14 +82,14 @@
       - ""
 
     docker_steps:
-      - "5. DOCKER GROUP -- LOG OUT AND BACK IN"
+      - "* DOCKER GROUP -- LOG OUT AND BACK IN"
       - "   Group membership is only read when a session starts, so `docker`"
       - "   without sudo will not work until you log out and back in."
       - "   Check with: id -nG | tr ' ' '\\n' | grep docker"
       - ""
 
     snap_steps:
-      - "6. SNAP PERMISSION PROMPTS (Ubuntu 26.04+)"
+      - "* SNAP PERMISSION PROMPTS (Ubuntu 26.04+)"
       - "   26.04 enables snap permission prompting by default. The first"
       - "   time a confined snap touches your home directory you get a"
       - "   dialog. Answer it once per app."
