@@ -70,7 +70,19 @@ else
 fi
 
 # --- run ----------------------------------------------------------------
-# -K  == --ask-become-pass: prompt once for the sudo password, so the tasks
-#        that need root can escalate while everything else stays as you.
-say "Running the playbook (you will be asked for your sudo password)"
-exec ansible-playbook local.yml -K "$@"
+# -K == --ask-become-pass: prompt once for the sudo password so the tasks that
+# need root can escalate while everything else keeps running as you.
+#
+# Only pass it when sudo actually requires a password. On a machine with
+# password-less sudo, -K would prompt for a password that is never used, and
+# in an automated run it would hang waiting for input.
+BECOME_ARGS=()
+if sudo -n true 2>/dev/null; then
+    say "sudo is password-less here; running without a password prompt"
+elif [[ "$*" == *ansible_become_password* ]]; then
+    say "become password supplied on the command line"
+else
+    BECOME_ARGS+=(-K)
+    say "Running the playbook (you will be asked for your sudo password)"
+fi
+exec ansible-playbook local.yml "${BECOME_ARGS[@]}" "$@"

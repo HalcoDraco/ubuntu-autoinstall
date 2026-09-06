@@ -197,6 +197,30 @@ cmd_bootstrap() {
     ssh_cmd "cd ~/ubuntu-autoinstall && ./bootstrap.sh ${*:-}"
 }
 
+cmd_require_password() {
+    # Regression test support for the sudo-rs bug on 26.04. cloud-init gives
+    # the VM password-less sudo, which is convenient but hid a bug that broke
+    # every privileged task on a real machine: 26.04's sudo-rs mangles the
+    # prompt Ansible looks for. Flip the VM to password sudo to exercise it.
+    is_running || die "VM is not running."
+    ssh_cmd "echo 'pablo:testpw123' | sudo chpasswd \
+             && sudo rm -f /etc/sudoers.d/90-cloud-init-users \
+             && echo 'pablo ALL=(ALL:ALL) ALL' | sudo tee /etc/sudoers.d/99-require-password >/dev/null \
+             && sudo -k"
+    say "sudo now requires a password (testpw123). Test with:"
+    printf '     ./vm/vm-helper.sh bootstrap -e ansible_become_password=testpw123\n'
+}
+
+cmd_allow_passwordless() {
+    is_running || die "VM is not running."
+    # Must feed the password on stdin: sudo currently REQUIRES one, so a plain
+    # `sudo tee` here would fail silently and leave the VM stuck.
+    ssh_cmd "echo testpw123 | sudo -S sh -c \"echo 'pablo ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-cloud-init-users; rm -f /etc/sudoers.d/99-require-password\" 2>/dev/null"
+    ssh_cmd "sudo -n true" >/dev/null 2>&1 \
+        && say "sudo is password-less again." \
+        || die "Failed to restore password-less sudo."
+}
+
 cmd_reset() {
     say "Reverting to a pristine machine"
     is_running && cmd_stop
@@ -222,6 +246,8 @@ case "${1:-}" in
     ssh)     shift; cmd_ssh "$@" ;;
     run)       shift; cmd_run "$@" ;;
     bootstrap) shift; cmd_bootstrap "$@" ;;
+    require-password)    shift; cmd_require_password "$@" ;;
+    allow-passwordless)  shift; cmd_allow_passwordless "$@" ;;
     desktop) shift; cmd_desktop "$@" ;;
     reset)   shift; cmd_reset "$@" ;;
     destroy) shift; cmd_destroy "$@" ;;

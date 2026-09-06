@@ -74,6 +74,60 @@
           - "host_vars/default.yml"
       tags: [always]
 
+    # ---------------------------------------------------------------------
+    # WORK AROUND sudo-rs ON UBUNTU 26.04
+    #
+    # 26.04 ships sudo-rs (a Rust reimplementation) as the default sudo. It
+    # does not reproduce the custom prompt Ansible passes with -p; it wraps it:
+    #
+    #   Ansible asks for:  [sudo via ansible, key=XXX] password:
+    #   sudo-rs emits:     [sudo: [sudo via ansible, key=XXX] password:] Password:
+    #
+    # Ansible matches the prompt with startswith(), so it never matches and
+    # EVERY privileged task fails with
+    #   "Timed out waiting for become success or become password prompt".
+    #
+    # Ubuntu still installs classic sudo alongside it as /usr/bin/sudo.ws, and
+    # that one honours -p correctly, so we point become at it when we detect
+    # the problem. On 22.04/24.04 neither condition holds and nothing changes.
+    # ---------------------------------------------------------------------
+    - name: Check which sudo implementation is in use
+      ansible.builtin.command: sudo --version
+      register: sudo_impl
+      changed_when: false     # a query
+      check_mode: false       # must run during --check too, or become breaks there
+      failed_when: false      # absence of sudo is handled below, not here
+      tags: [always]
+
+    - name: Look for classic sudo alongside sudo-rs
+      ansible.builtin.stat:
+        path: /usr/bin/sudo.ws
+      register: classic_sudo
+      tags: [always]
+
+    - name: Use classic sudo when sudo-rs would break privilege escalation
+      ansible.builtin.set_fact:
+        ansible_become_exe: /usr/bin/sudo.ws
+      when:
+        - "'sudo-rs' in (sudo_impl.stdout | default(''))"
+        - classic_sudo.stat.exists
+      tags: [always]
+
+    - name: Warn if sudo-rs is in use with no classic sudo to fall back on
+      ansible.builtin.fail:
+        msg: |
+          This machine uses sudo-rs, which does not reproduce the password
+          prompt Ansible looks for, and classic sudo (/usr/bin/sudo.ws) is not
+          installed to fall back on. Every privileged task would hang.
+
+          Fix it with either of:
+            sudo apt install -y sudo
+            sudo update-alternatives --config sudo    # choose sudo.ws
+      when:
+        - "'sudo-rs' in (sudo_impl.stdout | default(''))"
+        - not classic_sudo.stat.exists
+      tags: [always]
+
     - name: Detect whether an NVIDIA GPU is physically present
       # Asking the hardware directly, so the same settings work on every
       # machine: a desktop with a card installs the driver, a laptop without

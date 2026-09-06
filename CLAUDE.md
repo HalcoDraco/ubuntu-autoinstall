@@ -159,6 +159,19 @@ Gotchas discovered the hard way, do not regress these:
   unannotated copy of the value for comparison -- it gets converted the same
   way and the comparison never matches, so the role reports a change forever.
   Derive the comparison by stripping the "@..." prefix off the real value.
+- **Ubuntu 26.04 ships sudo-rs as the default sudo, and it breaks Ansible's
+  become.** It wraps the custom prompt Ansible passes with -p:
+      asked:   [sudo via ansible, key=XXX] password:
+      emitted: [sudo: [sudo via ansible, key=XXX] password:] Password:
+  Ansible matches with startswith(), so EVERY privileged task dies with
+  "Timed out waiting for become success or become password prompt". local.yml
+  detects sudo-rs in pre_tasks and points ansible_become_exe at
+  /usr/bin/sudo.ws (classic sudo, still installed alongside). Do not remove.
+- **Test with PASSWORD sudo, not just password-less.** Every VM test used
+  cloud-init's NOPASSWD sudo, which hid the sudo-rs bug completely until it
+  broke a real machine. Use `./vm/vm-helper.sh require-password` then
+  `bootstrap -e ansible_become_password=testpw123`, and
+  `allow-passwordless` to restore.
 - Docker Engine alone CANNOT use the GPU. nvidia_container installs the NVIDIA
   Container Toolkit; without it `docker run --gpus all` fails. Check
   daemon.json before running nvidia-ctk -- it always exits 0 and reconfiguring

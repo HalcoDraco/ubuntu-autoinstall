@@ -168,6 +168,18 @@ Change the Ubuntu version it tests in `vm/vm.env`
 
 ---
 
+## If privileged tasks hang on Ubuntu 26.04
+
+Symptom: `Timed out waiting for become success or become password prompt`.
+
+26.04's default `sudo` (sudo-rs) does not print the prompt Ansible expects.
+The playbook detects this and switches to classic sudo automatically. If it
+tells you classic sudo is missing:
+
+```bash
+sudo apt install -y sudo
+```
+
 ## If something breaks
 
 ```bash
