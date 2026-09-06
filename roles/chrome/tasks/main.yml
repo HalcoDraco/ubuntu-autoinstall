@@ -121,8 +121,10 @@
 - name: Note that Chrome's install was skipped in check mode
   ansible.builtin.debug:
     msg: >-
-      Dry run: the Google Chrome repo does not exist on this machine yet, so
-      the package cannot be seen. A real run adds the repo first and installs
-      normally.
+      Dry run: this run would add or modify the Google Chrome repo file, and
+      --check never actually writes it or refreshes apt's cache. So the
+      package cannot be checked against it here. A real run writes the repo
+      first, then installs normally. (If Chrome is already installed, a real
+      run leaves it alone -- state: present never upgrades.)
   when: ansible_check_mode and chrome_repo.changed
   tags: [chrome]

@@ -68,10 +68,10 @@
 - name: Note that the mise install was skipped in check mode
   ansible.builtin.debug:
     msg: >-
-      Dry run: the mise repo does not exist on this machine yet, so the
-      package cannot be seen. A real run adds the repo first, then installs
-      mise and the JDK. Everything after this point is skipped for the same
-      reason.
+      Dry run: this run would add or modify the mise repo file, and --check
+      never actually writes it or refreshes apt's cache, so the mise package
+      cannot be checked against it. A real run writes the repo first, then
+      installs mise and the JDK.
   when: ansible_check_mode and mise_repo.changed
   tags: [mise]
 

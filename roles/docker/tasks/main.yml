@@ -57,9 +57,11 @@
 - name: Note that Docker's install was skipped in check mode
   ansible.builtin.debug:
     msg: >-
-      Dry run: the Docker repo does not exist on this machine yet, so the
-      packages cannot be seen and the service/group steps are skipped too.
-      A real run adds the repo first and proceeds normally.
+      Dry run: this run would add or modify the Docker repo file, and --check
+      never actually writes it or refreshes apt's cache, so the packages
+      cannot be checked against it. The service and group steps are skipped
+      for the same reason. A real run writes the repo first and proceeds
+      normally.
   when:
     - ansible_check_mode
     - docker_repo_check.status | default(0) == 200
