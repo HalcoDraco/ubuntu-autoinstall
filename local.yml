@@ -109,6 +109,17 @@
       # hardware really is there before touching drivers.
       when: nvidia_gpu_present | bool
 
+    # GPU containers. Only meaningful when BOTH Docker and an NVIDIA GPU are
+    # present, which is why it is its own role rather than living inside
+    # either one. Must run after both. Docker Engine alone cannot reach the
+    # GPU -- `docker run --gpus all` fails without this.
+    - role: nvidia_container
+      tags: [nvidia_container, docker, nvidia]
+      when:
+        - install_docker | bool
+        - nvidia_gpu_present | bool
+        - install_nvidia_container | bool
+
     - role: mise
       tags: [mise]
       when: install_mise | bool

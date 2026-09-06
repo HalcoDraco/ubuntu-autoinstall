@@ -1,0 +1,8 @@
+# Managed by ubuntu-autoinstall (roles/nvidia_container). Do not edit by hand.
+#
+# A flat repository: "Suites: /" with no Components. There is no Ubuntu
+# codename anywhere here, so this definition survives release upgrades.
+Types: deb
+URIs: {{ nvidia_container_repo_uri }}/{{ nvidia_container_arch }}
+Suites: /
+Signed-By: {{ nvidia_container_keyring_path }}

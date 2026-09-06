@@ -109,4 +109,20 @@
     # no reason.
     update_cache: "{{ chrome_repo.changed }}"
   become: true
+  # CHECK-MODE ARTEFACT, not a real problem:
+  # in --check the repo file above was not actually written and apt's cache
+  # was not refreshed, so this package genuinely is not in the cache yet and
+  # apt fails with "No package matching". Skip it during a dry run on a
+  # machine that does not have the repo yet, and say so, rather than letting
+  # `make check` fail on a fresh machine.
+  when: not (ansible_check_mode and chrome_repo.changed)
+  tags: [chrome]
+
+- name: Note that Chrome's install was skipped in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Dry run: the Google Chrome repo does not exist on this machine yet, so
+      the package cannot be seen. A real run adds the repo first and installs
+      normally.
+  when: ansible_check_mode and chrome_repo.changed
   tags: [chrome]

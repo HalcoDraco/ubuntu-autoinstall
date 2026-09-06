@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  author: Pablo Gonzalez Monfort
+  description: "ubuntu-autoinstall role: nvidia_container"
+  license: MIT
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags: []
+dependencies: []

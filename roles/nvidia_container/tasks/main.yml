@@ -1,0 +1,102 @@
+---
+# ===========================================================================
+# nvidia_container -- lets Docker use the NVIDIA GPU.
+#
+# WHY THIS EXISTS AS A SEPARATE ROLE:
+# Docker Engine on its own CANNOT reach the GPU. `docker run --gpus all`
+# fails with "could not select device driver". The missing piece is the
+# NVIDIA Container Toolkit, which supplies the runtime hook that injects the
+# driver and devices into a container.
+#
+# It is separate from both `docker` and `nvidia` because it is the
+# intersection of the two: it is only meaningful when BOTH a GPU driver and
+# Docker are present. local.yml gates it on exactly that.
+#
+# Ordering matters: this must run after the docker and nvidia roles.
+# ===========================================================================
+
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+  tags: [nvidia_container]
+
+- name: Fetch the NVIDIA Container Toolkit signing key
+  ansible.builtin.get_url:
+    url: "{{ nvidia_container_key_url }}"
+    dest: "{{ nvidia_container_keyring_path }}"
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  tags: [nvidia_container]
+
+- name: Add the NVIDIA Container Toolkit apt repository
+  ansible.builtin.template:
+    src: nvidia-container-toolkit.sources.j2
+    dest: /etc/apt/sources.list.d/nvidia-container-toolkit.sources
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  register: nvidia_container_repo
+  tags: [nvidia_container]
+
+- name: Remove the legacy one-line toolkit source
+  # NVIDIA's own documented install writes nvidia-container-toolkit.list.
+  # Leaving it alongside our .sources file makes apt warn about a duplicate
+  # repository on every update.
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    state: absent
+  become: true
+  tags: [nvidia_container]
+
+- name: Install the NVIDIA Container Toolkit
+  ansible.builtin.apt:
+    name: "{{ nvidia_container_packages }}"
+    state: present
+    install_recommends: false
+    update_cache: "{{ nvidia_container_repo.changed }}"
+  become: true
+  # Same check-mode artefact as the other repo-backed installs.
+  when: not (ansible_check_mode and nvidia_container_repo.changed)
+  tags: [nvidia_container]
+
+- name: Check whether Docker already knows about the nvidia runtime
+  # nvidia-ctk is not idempotent in any way Ansible can see -- it rewrites
+  # /etc/docker/daemon.json and always exits 0. So we look at the file first
+  # and only reconfigure when the runtime is genuinely absent. Without this,
+  # every run would restart Docker and kill your running containers.
+  ansible.builtin.command: grep -q '"nvidia"' /etc/docker/daemon.json
+  register: nvidia_container_configured
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: [nvidia_container]
+
+- name: Configure Docker to use the nvidia runtime
+  ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
+  become: true
+  when:
+    - nvidia_container_configured.rc | default(1) != 0
+    - not ansible_check_mode
+  changed_when: true    # only reached when the runtime was missing
+  notify: restart docker
+  tags: [nvidia_container]
+
+- name: Report GPU container status
+  ansible.builtin.debug:
+    msg: >-
+      {% if nvidia_container_configured.rc | default(1) == 0 %}
+      Docker already has the nvidia runtime configured. Test it with:
+      docker run --rm --gpus all ubuntu nvidia-smi
+      {% else %}
+      Configured Docker's nvidia runtime. Test with:
+      docker run --rm --gpus all ubuntu nvidia-smi
+      {% endif %}
+  tags: [nvidia_container]

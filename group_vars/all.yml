@@ -53,6 +53,11 @@ snap_packages_classic: []
 # ---------------------------------------------------------------------------
 install_chrome: true
 install_docker: true
+
+# Lets Docker use the GPU (`docker run --gpus all ...`). Only takes effect on
+# a machine that has BOTH docker and an NVIDIA GPU, so it is safe to leave on
+# for the laptop -- it simply never runs there.
+install_nvidia_container: true
 install_mise: true
 configure_keyboard: true
 

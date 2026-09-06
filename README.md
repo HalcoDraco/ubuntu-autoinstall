@@ -305,6 +305,7 @@ untestable. It would only cover the apt layer.
 | `manual_steps` | `manual_steps` | **Done** — prints the checklist |
 | `docker` | `docker` | **Done** — Docker Engine from Docker's repo, user added to `docker` group |
 | `nvidia` | `nvidia` | **Done** — `ubuntu-drivers install`, triple-guarded |
+| `nvidia_container` | `nvidia_container` | **Done** — lets Docker use the GPU |
 | `mise` | `mise` | **Done** — latest JDK, no version hardcoded |
 
 **Firefox is deliberately left untouched.** Nothing in this repo removes,
@@ -353,6 +354,28 @@ The role checks that Docker publishes a repo for your Ubuntu release before
 writing anything. Docker can lag weeks behind a new release; without that
 check the failure is a broken source file that breaks every later `apt`
 command.
+
+### GPU containers
+
+**Docker Engine on its own cannot use the GPU.** `docker run --gpus all` fails
+with "could not select device driver" unless the NVIDIA Container Toolkit is
+installed — it supplies the runtime hook that injects the driver and devices
+into the container.
+
+The `nvidia_container` role installs it and points Docker at the `nvidia`
+runtime. It only runs when a machine has **both** Docker and an NVIDIA GPU, so
+it never fires on the laptop. Test it with:
+
+```bash
+docker run --rm --gpus all ubuntu nvidia-smi
+```
+
+The role checks `/etc/docker/daemon.json` before reconfiguring, because
+`nvidia-ctk` always exits 0 and rewriting it would restart Docker — killing
+your running containers — on every single run.
+
+> Its apt repository is a *flat* repo (`Suites: /`, no components, no
+> codename), so it cannot rot across an Ubuntu upgrade.
 
 ### NVIDIA
 

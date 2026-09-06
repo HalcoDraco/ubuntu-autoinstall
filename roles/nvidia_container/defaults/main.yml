@@ -1,0 +1,21 @@
+---
+# NVIDIA Container Toolkit repository.
+#
+# This is a "flat" apt repository: no dists/ hierarchy, no codename, no
+# components. In deb822 that is expressed as "Suites: /" with no Components
+# line. Being codename-free means it cannot rot across an Ubuntu upgrade.
+nvidia_container_repo_uri: "https://nvidia.github.io/libnvidia-container/stable/deb"
+nvidia_container_key_url: "https://nvidia.github.io/libnvidia-container/gpgkey"
+nvidia_container_keyring_path: "/etc/apt/keyrings/nvidia-container-toolkit.asc"
+
+# NVIDIA publishes per-architecture directories. Map Ansible's architecture
+# fact (x86_64 / aarch64) onto Debian's names (amd64 / arm64) rather than
+# using apt's $(ARCH) substitution, which is not reliably supported in deb822.
+nvidia_container_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+nvidia_container_arch: >-
+  {{ nvidia_container_arch_map[ansible_facts['architecture']] | default('amd64') }}
+
+nvidia_container_packages:
+  - nvidia-container-toolkit

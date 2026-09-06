@@ -131,7 +131,7 @@ Runtime uses the system Ansible that `bootstrap.sh` installs.
 ## Current status
 
 All roles implemented: `base`, `packages`, `chrome`, `docker`, `nvidia`,
-`mise`, `keyboard`, `manual_steps`.
+`nvidia_container`, `mise`, `keyboard`, `manual_steps`.
 
 Gotchas discovered the hard way, do not regress these:
 - Inside a `>-` folded YAML scalar, `#` is literal text, NOT a comment.
@@ -142,6 +142,16 @@ Gotchas discovered the hard way, do not regress these:
   group. Omitting it REPLACES all groups and would strip `sudo`.
 - Docker publishes per-codename repos and can lag a new Ubuntu release, so the
   role HEAD-checks the repo before writing a source file.
+- Any apt install backed by a repo THIS PLAYBOOK adds must carry
+  `when: not (ansible_check_mode and <repo>.changed)`, and so must everything
+  downstream of it (services, groups). In --check the repo file is never
+  written and the cache never refreshed, so the package is genuinely absent
+  and `make check` fails on a fresh machine. This bit us three times: chrome,
+  mise, then docker's service+group tasks.
+- Docker Engine alone CANNOT use the GPU. nvidia_container installs the NVIDIA
+  Container Toolkit; without it `docker run --gpus all` fails. Check
+  daemon.json before running nvidia-ctk -- it always exits 0 and reconfiguring
+  restarts Docker, killing running containers.
 
 The keyboard layout now contains the user's REAL 14 key mappings, recovered by
 diffing their hand-edited `/usr/share/X11/xkb/symbols/us` against the pristine

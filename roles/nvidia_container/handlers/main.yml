@@ -1,0 +1,11 @@
+---
+# A handler runs only when a task notifies it, and only ONCE at the end of the
+# play no matter how many tasks notified it. This is the first handler in the
+# repo: restarting Docker is disruptive (it stops running containers), so it
+# must happen only when the runtime config actually changed, and only once.
+- name: Restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  become: true
+  listen: restart docker

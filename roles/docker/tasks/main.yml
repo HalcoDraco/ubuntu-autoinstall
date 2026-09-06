@@ -54,6 +54,17 @@
   tags: [docker]
 
 # Everything below only runs when the repo really exists.
+- name: Note that Docker's install was skipped in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Dry run: the Docker repo does not exist on this machine yet, so the
+      packages cannot be seen and the service/group steps are skipped too.
+      A real run adds the repo first and proceeds normally.
+  when:
+    - ansible_check_mode
+    - docker_repo_check.status | default(0) == 200
+  tags: [docker]
+
 - name: Install Docker Engine
   when: docker_repo_check.status | default(0) == 200
   tags: [docker]
@@ -87,6 +98,13 @@
         install_recommends: false
         update_cache: "{{ docker_repo.changed }}"
       become: true
+      # CHECK-MODE ARTEFACT, not a real problem:
+      # in --check the repo file above was not actually written and apt's cache
+      # was not refreshed, so this package genuinely is not in the cache yet and
+      # apt fails with "No package matching". Skip it during a dry run on a
+      # machine that does not have the repo yet, and say so, rather than letting
+      # `make check` fail on a fresh machine.
+      when: not (ansible_check_mode and docker_repo.changed)
 
     - name: Ensure the docker service is enabled and running
       # MODULE CHOICE: systemd rather than `command: systemctl start docker`.
@@ -101,6 +119,10 @@
         state: started
         enabled: true
       become: true
+      # Same dry-run artefact: in --check the package was not installed, so
+      # the service unit does not exist yet and this would fail with
+      # "Could not find the requested service docker".
+      when: not (ansible_check_mode and docker_repo.changed)
 
     - name: Add the user to the docker group - {{ docker_user }}
       # append: true is essential. Without it, this REPLACES all of the
@@ -111,8 +133,11 @@
         groups: docker
         append: true
       become: true
+      # Dry run: the "docker" group is created by the package, which was not
+      # installed, so this would fail on a nonexistent group.
+      when: not (ansible_check_mode and docker_repo.changed)
       register: docker_group
 
     - name: Record whether a re-login is needed for group membership
       ansible.builtin.set_fact:
-        docker_relogin_required: "{{ docker_group.changed }}"
+        docker_relogin_required: "{{ docker_group.changed | default(false) }}"
