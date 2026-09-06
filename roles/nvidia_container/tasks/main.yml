@@ -95,8 +95,11 @@
       {% if nvidia_container_configured.rc | default(1) == 0 %}
       Docker already has the nvidia runtime configured. Test it with:
       docker run --rm --gpus all ubuntu nvidia-smi
+      {% elif ansible_check_mode %}
+      Dry run: Docker's nvidia runtime is NOT configured yet. A real run will
+      configure it and restart Docker.
       {% else %}
-      Configured Docker's nvidia runtime. Test with:
+      Configured Docker's nvidia runtime and restarted Docker. Test with:
       docker run --rm --gpus all ubuntu nvidia-smi
       {% endif %}
   tags: [nvidia_container]

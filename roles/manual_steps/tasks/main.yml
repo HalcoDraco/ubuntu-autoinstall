@@ -33,6 +33,33 @@
       {{ (manual_steps_secureboot.stdout | default('')) is search('SecureBoot enabled') }}
   tags: [manual_steps]
 
+- name: Summarise the NVIDIA outcome for the checklist
+  # Three distinct states, and conflating them produces a message that lies:
+  #   no card            -> nothing to do
+  #   card, driver fine  -> nothing was reinstalled
+  #   card, no driver    -> a driver was installed (Secure Boot may apply)
+  # nvidia_driver_working is set by the nvidia role, so it is UNDEFINED when
+  # only --tags manual_steps ran. That is a fourth state, not "false".
+  ansible.builtin.set_fact:
+    manual_steps_nvidia_line: >-
+      {{
+        'NVIDIA GPU detected: False. No card found, so the driver and '
+        ~ 'GPU-container steps were skipped.'
+        if not (nvidia_hardware_present | default(false) | bool)
+        else (
+          'NVIDIA GPU detected: True, but the nvidia role did not run in this '
+          ~ 'invocation, so its outcome is unknown.'
+          if nvidia_driver_working is not defined
+          else (
+            'NVIDIA GPU detected: True. Driver already working, so nothing '
+            ~ 'was reinstalled.'
+            if nvidia_driver_working | bool
+            else 'NVIDIA GPU detected: True. A driver was installed -- see the Secure Boot note above.'
+          )
+        )
+      }}
+  tags: [manual_steps]
+
 - name: Print the manual steps checklist
   ansible.builtin.debug:
     msg: "{{ manual_steps_header + manual_steps_always + manual_steps_conditional + manual_steps_footer }}"
@@ -139,10 +166,7 @@
 
     manual_steps_footer:
       - "-----------------------------------------------------------"
-      - >-
-        NVIDIA GPU detected: {{ nvidia_hardware_present | default(false) }}
-        -- driver/GPU-container steps
-        {{ 'ran' if (nvidia_hardware_present | default(false) | bool) else 'were skipped (no card found)' }}.
+      - "{{ manual_steps_nvidia_line }}"
       - "NOTE: Firefox was deliberately left untouched by this playbook."
       - "==========================================================="
   tags: [manual_steps]
