@@ -1,34 +1,95 @@
 ---
 # ===========================================================================
-# nvidia -- STUB. Implemented in a follow-up session.
+# nvidia -- proprietary driver, via Ubuntu's own ubuntu-drivers tool.
 #
-# This role only runs at all when host_vars sets nvidia_gpu_present: true
-# (see local.yml). The tasks below add a SECOND, independent check against the
-# actual PCI bus, so that a mistaken host variable cannot cause a driver
-# install on a machine with no NVIDIA card.
+# THIS ROLE IS DELIBERATELY THE MOST CAUTIOUS IN THE REPO. A wrong driver
+# install can leave a machine without a working display or, with Secure Boot
+# on, without a loadable kernel module. So it refuses to act unless three
+# independent things all agree:
 #
-# PLANNED IMPLEMENTATION:
-#   1. Detect the card:  lspci -d {{ nvidia_pci_vendor_id }}:
-#      as a read-only command with changed_when: false
-#   2. Detect an existing working driver (nvidia-smi succeeds) and skip if so,
-#      per your "skip if a suitable driver is already installed" requirement
-#   3. Otherwise run `ubuntu-drivers install`
-#      -- Ubuntu's own tool, which picks the right driver for the card and
-#      the running kernel. Far more durable than naming nvidia-driver-XXX,
-#      which is a versioned package name and would rot exactly the way you
-#      said you did not want.
-#   4. Detect whether Secure Boot is on and, if so, flag MOK enrollment for
-#      the manual-steps checklist -- it needs a password set at install time
-#      and a blue enrollment screen at the next boot. Genuinely not scriptable.
+#   1. host_vars says this machine has an NVIDIA GPU  (gate in local.yml)
+#   2. an NVIDIA device is actually present on the PCI bus
+#   3. no working driver is already installed
 #
-# NOTE for this machine: Niaura-linux already has driver 595.84 with DKMS
-# modules built for three kernels and Secure Boot enabled, so a correct
-# implementation must no-op here entirely.
+# WHY `ubuntu-drivers install` AND NOT nvidia-driver-XXX:
+# Naming a versioned package is exactly the rot you asked me to avoid --
+# nvidia-driver-550 is wrong by the next release. ubuntu-drivers asks Ubuntu
+# which driver suits THIS card on THIS kernel, so it stays correct forever.
 # ===========================================================================
 
-- name: Report that the nvidia role is not yet implemented
-  ansible.builtin.debug:
-    msg:
-      - "SKIPPED: nvidia role is a stub -- scheduled for a follow-up session."
-      - "No driver was installed and no kernel module was touched."
+- name: Look for an NVIDIA GPU on the PCI bus
+  # Independent hardware check, so a mistaken host variable cannot cause a
+  # driver install on a machine with no NVIDIA card.
+  #
+  # Reading /proc/bus/pci/devices avoids depending on lspci being installed
+  # (it is not, on a minimal install). Vendor 10de is NVIDIA.
+  ansible.builtin.shell:
+    cmd: "set -o pipefail; awk '{print $2}' /proc/bus/pci/devices | grep -qi '^{{ nvidia_pci_vendor_id }}' && echo present || echo absent"
+    executable: /bin/bash
+  register: nvidia_pci
+  changed_when: false     # a query never changes anything
+  check_mode: false       # still run during --check; it only reads
+  failed_when: false      # "no GPU" is an answer, not an error
   tags: [nvidia]
+
+- name: Check whether a working NVIDIA driver is already installed
+  # Your requirement: skip if a suitable driver is already present. If
+  # nvidia-smi runs and reports a version, the driver works -- reinstalling
+  # would rebuild kernel modules and, under Secure Boot, could require
+  # re-enrolling a key for no benefit.
+  ansible.builtin.command: nvidia-smi --query-gpu=driver_version --format=csv,noheader
+  register: nvidia_smi
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: [nvidia]
+
+- name: Summarise what was detected
+  ansible.builtin.set_fact:
+    nvidia_hardware_present: "{{ (nvidia_pci.stdout | default('absent')) is search('present') }}"
+    nvidia_driver_working: "{{ nvidia_smi.rc | default(1) == 0 }}"
+  tags: [nvidia]
+
+- name: Report the NVIDIA decision
+  ansible.builtin.debug:
+    msg: >-
+      {% if not nvidia_hardware_present %}
+      No NVIDIA GPU found on the PCI bus, so no driver will be installed
+      (host_vars claims one is present -- worth checking).
+      {% elif nvidia_driver_working %}
+      NVIDIA driver {{ nvidia_smi.stdout | trim }} is already installed and
+      working. Nothing to do.
+      {% else %}
+      NVIDIA GPU found with no working driver. Installing via ubuntu-drivers.
+      {% endif %}
+  tags: [nvidia]
+
+- name: Install the recommended NVIDIA driver
+  when:
+    - nvidia_hardware_present | bool
+    - not (nvidia_driver_working | bool)
+  tags: [nvidia]
+  block:
+
+    - name: Ensure ubuntu-drivers-common is installed
+      ansible.builtin.apt:
+        name: ubuntu-drivers-common
+        state: present
+        install_recommends: false
+      become: true
+
+    - name: Run ubuntu-drivers install
+      # No proper Ansible module exists for this, so command: with guards.
+      # creates: is not usable (the tool writes no single predictable file),
+      # so idempotency comes from the `when:` above instead: this task cannot
+      # run at all once nvidia-smi works.
+      ansible.builtin.command: ubuntu-drivers install
+      become: true
+      register: nvidia_install
+      changed_when: nvidia_install.rc == 0
+      # Deliberately NOT run during --check: it installs kernel modules.
+      # In a --check run you will see this as "skipped".
+
+    - name: Flag that a reboot is required
+      ansible.builtin.set_fact:
+        nvidia_reboot_required: true

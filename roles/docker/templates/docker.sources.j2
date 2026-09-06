@@ -1,0 +1,14 @@
+# Managed by ubuntu-autoinstall (roles/docker). Do not edit by hand.
+#
+# Suites is the Ubuntu codename, taken from a fact rather than written as a
+# literal. That single line is what lets this repo survive a release upgrade:
+# on 22.04 it resolves to "jammy", on 24.04 "noble", on 26.04 "resolute".
+#
+# Architectures is deliberately omitted so apt uses the system architecture.
+# Docker publishes amd64 and arm64, so hardcoding amd64 would break on an
+# ARM machine for no benefit.
+Types: deb
+URIs: {{ docker_repo_uri }}
+Suites: {{ ansible_facts['distribution_release'] }}
+Components: stable
+Signed-By: {{ docker_keyring_path }}

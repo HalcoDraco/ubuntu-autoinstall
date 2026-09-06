@@ -1,33 +1,151 @@
 ---
 # ===========================================================================
-# mise -- STUB. Implemented in a follow-up session.
+# mise -- the latest JDK, without ever naming a version.
 #
-# PLANNED IMPLEMENTATION:
-#   1. get_url the signing key, deb822_repository, apt install mise  (as root)
-#   2. Template {{ mise_tools }} from group_vars into ~/.config/mise/config.toml
-#      (as YOUR user, not root -- it is your home directory)
-#   3. Run `mise install` with a proper changed_when, keyed off whether the
-#      tool was already present
+# WHY mise AND NOT apt's default-jdk / openjdk-NN-jdk:
+# Ubuntu ships whatever JDK was current when the release froze, and naming
+# openjdk-25-jdk is exactly the versioned-package rot you asked me to avoid.
+# mise resolves "latest" at install time, so this stays correct forever.
 #
-# WHY SHIMS ON PATH RATHER THAN `mise activate`:
-# `mise activate` installs a shell hook in ~/.bashrc, which only affects
-# interactive terminals. Anything launched from the GNOME menu -- an IDE, a
-# .desktop launcher -- would not see java at all. Adding
-# {{ mise_shims_path }} to PATH via ~/.profile covers both, because the
-# display manager sources ~/.profile at login.
+# WHY mise AND NOT SDKMAN: mise has a real apt repo with no codename in it,
+# so it updates through apt like everything else. SDKMAN is a bash-function
+# shim installed by piping curl into a shell, with no apt path.
 #
-# HONEST CAVEAT worth repeating in the README: a mise-managed JDK is a
-# USER-level install. `java` on the command line works, but an apt package
-# declaring `Depends: default-jre` will not see it. If you ever need a true
-# system JDK, add one to apt_packages in group_vars/all.yml.
-#
-# Setting java = "latest" gets the newest JDK release, including non-LTS ones.
-# Change to "lts" in group_vars/all.yml if you would rather track LTS.
+# TWO PRIVILEGE LEVELS, like the keyboard role:
+#   * the mise package itself is system-wide -> root
+#   * the tool list and the JDK live in YOUR home -> NOT root
+# Installing the JDK as root would put it in /root and leave your account
+# without a working java.
 # ===========================================================================
 
-- name: Report that the mise role is not yet implemented
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+  tags: [mise]
+
+- name: Fetch mise's package signing key
+  ansible.builtin.get_url:
+    url: "{{ mise_signing_key_url }}"
+    dest: "{{ mise_keyring_path }}"
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  tags: [mise]
+
+- name: Add the mise apt repository
+  ansible.builtin.template:
+    src: mise.sources.j2
+    dest: /etc/apt/sources.list.d/mise.sources
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  register: mise_repo
+  tags: [mise]
+
+- name: Install mise
+  ansible.builtin.apt:
+    name: mise
+    state: present
+    install_recommends: false
+    update_cache: "{{ mise_repo.changed }}"
+  become: true
+  tags: [mise]
+
+# ------------------- everything below runs as YOU, not root ----------------
+
+- name: Ensure the mise config directory exists
+  ansible.builtin.file:
+    path: "{{ mise_config_dir }}"
+    state: directory
+    mode: "0755"
+  become: false
+  tags: [mise]
+
+- name: Write the mise tool list
+  # Driven by mise_tools in group_vars/all.yml, so adding a language later
+  # (node, python, go) is a one-line edit there rather than a change here.
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: "{{ mise_config_dir }}/config.toml"
+    mode: "0644"
+  become: false
+  register: mise_config
+  tags: [mise]
+
+- name: Check which tools mise has already installed
+  ansible.builtin.command: mise ls --installed --json
+  become: false
+  register: mise_installed
+  changed_when: false     # a query
+  check_mode: false
+  failed_when: false      # empty/absent config is not an error
+  tags: [mise]
+
+- name: Work out which requested tools are not installed yet
+  # `mise install` is idempotent in effect -- it skips tools already present --
+  # but it always exits 0 and prints nothing useful, so Ansible cannot tell
+  # "installed a JDK" from "did nothing". Rather than guess from output text,
+  # we compare what config.toml asks for against what `mise ls` reports.
+  # That makes the next task's changed_when truthful instead of decorative.
+  ansible.builtin.set_fact:
+    mise_missing_tools: >-
+      {{ mise_tools.keys() | list
+         | difference(mise_installed_map.keys() | list) }}
+  vars:
+    mise_installed_map: >-
+      {{ (mise_installed.stdout | from_json)
+         if (mise_installed.rc | default(1)) == 0
+            and (mise_installed.stdout | default('') | trim | length) > 0
+         else {} }}
+  tags: [mise]
+
+- name: Install the tools listed in config.toml
+  ansible.builtin.command: mise install --yes
+  become: false
+  when: mise_missing_tools | length > 0
+  changed_when: true    # only reached when something really was missing
+  tags: [mise]
+
+- name: Put the mise shims on PATH via ~/.profile
+  # WHY ~/.profile AND NOT `mise activate` in ~/.bashrc:
+  # A bashrc hook only affects interactive terminals. Anything launched from
+  # the GNOME menu -- an IDE, a .desktop file -- would not find java at all.
+  # The display manager sources ~/.profile at login, so shims on PATH there
+  # work for both terminals and GUI apps.
+  ansible.builtin.blockinfile:
+    path: "{{ ansible_facts['env'].HOME }}/.profile"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - ubuntu-autoinstall (mise)"
+    block: |
+      # Put mise's shims on PATH so `java` works in terminals AND in apps
+      # launched from the GNOME menu.
+      if [ -d "$HOME/.local/share/mise/shims" ]; then
+          PATH="$HOME/.local/share/mise/shims:$PATH"
+      fi
+  become: false
+  tags: [mise]
+
+- name: Report the installed Java version
+  ansible.builtin.command: "{{ mise_shims_path }}/java -version"
+  become: false
+  register: mise_java_version
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: [mise]
+
+- name: Show which JDK is now active
   ansible.builtin.debug:
-    msg:
-      - "SKIPPED: mise/JDK role is a stub -- scheduled for a follow-up session."
-      - "No JDK was installed."
+    msg: >-
+      {{ (mise_java_version.stderr | default('') | trim | split('\n') | first)
+         if mise_java_version.rc | default(1) == 0
+         else 'java not reporting a version yet -- open a new terminal, or check `mise ls`.' }}
   tags: [mise]

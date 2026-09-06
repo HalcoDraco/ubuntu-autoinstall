@@ -1,4 +1,8 @@
 ---
-# Vendor ID 10de is NVIDIA. Used to verify the hardware really is present
-# before touching drivers, independently of the host variable.
+# Vendor ID 10de is NVIDIA. Used for the independent hardware check that
+# runs regardless of what host_vars claims.
 nvidia_pci_vendor_id: "10de"
+
+# Set by the role when a driver was installed; read by manual_steps to decide
+# whether to print the Secure Boot / MOK enrollment instructions.
+nvidia_reboot_required: false

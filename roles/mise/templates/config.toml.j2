@@ -1,0 +1,9 @@
+# Managed by ubuntu-autoinstall (roles/mise) from mise_tools in
+# group_vars/all.yml. Edit it there, not here -- this file is overwritten.
+#
+# "latest" tracks the newest JDK release. Change to "lts" in group_vars if you
+# would rather track long-term-support versions.
+[tools]
+{% for tool, version in mise_tools.items() %}
+{{ tool }} = "{{ version }}"
+{% endfor %}

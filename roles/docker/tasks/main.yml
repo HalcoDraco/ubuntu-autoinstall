@@ -1,32 +1,114 @@
 ---
 # ===========================================================================
-# docker -- STUB. Implemented in a follow-up session.
+# docker -- Docker Engine (NOT Docker Desktop) from Docker's official repo.
 #
-# PLANNED IMPLEMENTATION (hand-rolled, ~40 lines):
-#   1. get_url  Docker's GPG key -> {{ docker_keyring_path }}
-#   2. template a .sources file with
-#      Suites: {{ ansible_facts['distribution_release'] }}
-#      (template, not deb822_repository -- see roles/chrome for why)
-#   3. apt install {{ docker_packages }}
-#   4. systemd: enable + start docker
-#   5. user: append the invoking user to the "docker" group
+# ROLE CHOICE: hand-rolled rather than geerlingguy.docker.
+# That role is well maintained, but it carries Debian/RedHat/Fedora branching
+# we do not need, and its per-distro version logic is exactly the kind of
+# thing that breaks on a release as new as 26.04. This is ~50 lines we fully
+# control, with no galaxy dependency to audit on every bump. For a repo whose
+# entire purpose is surviving Ubuntu upgrades, fewer moving parts wins.
 #
-# ROLE CHOICE -- hand-rolled vs geerlingguy.docker:
-# Leaning hand-rolled. That role carries Debian/RedHat/Fedora branching we do
-# not need, pins its own repo handling that we would have to audit on every
-# bump, and its Ubuntu-version logic is precisely the kind of thing that
-# breaks on a release as new as 26.04. Five explicit tasks we control beat a
-# dependency we must trust. Final call when it is written.
-#
-# SECURITY NOTE for when this is implemented: adding a user to the "docker"
-# group grants effective root (that user can `docker run -v /:/host` and edit
-# anything). That is the standard trade-off and what you asked for, but it is
-# worth stating plainly rather than burying.
+# SECURITY NOTE, stated plainly rather than buried: adding your user to the
+# "docker" group grants effective root. Any member can run
+# `docker run -v /:/host ...` and edit any file on the system. This is the
+# standard trade-off for using docker without sudo, and it is what you asked
+# for -- but it is worth knowing.
 # ===========================================================================
 
-- name: Report that the docker role is not yet implemented
-  ansible.builtin.debug:
-    msg:
-      - "SKIPPED: docker role is a stub -- scheduled for a follow-up session."
-      - "Nothing was installed and no group membership was changed."
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
   tags: [docker]
+
+- name: Check that Docker publishes a repo for this Ubuntu release
+  # Docker builds per-codename repositories, and a brand-new Ubuntu release
+  # can exist for weeks before Docker publishes for it. Without this check the
+  # failure mode is a cryptic "404 Not Found" from apt AFTER we have written a
+  # broken source file -- which then breaks every later apt command.
+  # Checking first means we skip cleanly instead.
+  ansible.builtin.uri:
+    url: "{{ docker_repo_uri }}/dists/{{ ansible_facts['distribution_release'] }}/Release"
+    method: HEAD
+    status_code: [200, 403, 404]
+  register: docker_repo_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: [docker]
+
+- name: Explain that Docker has no repo for this release yet
+  ansible.builtin.debug:
+    msg: >-
+      Docker does not publish an apt repository for
+      '{{ ansible_facts['distribution_release'] }}' yet
+      (HTTP {{ docker_repo_check.status | default('unknown') }}).
+      Skipping Docker rather than writing a source file that would break apt.
+      Re-run this playbook once Docker publishes for this release.
+  when: docker_repo_check.status | default(0) != 200
+  tags: [docker]
+
+# Everything below only runs when the repo really exists.
+- name: Install Docker Engine
+  when: docker_repo_check.status | default(0) == 200
+  tags: [docker]
+  block:
+
+    - name: Fetch Docker's package signing key
+      ansible.builtin.get_url:
+        url: "{{ docker_signing_key_url }}"
+        dest: "{{ docker_keyring_path }}"
+        mode: "0644"
+        owner: root
+        group: root
+      become: true
+
+    - name: Add the Docker apt repository
+      # template, not deb822_repository -- see roles/chrome for the full
+      # reasoning (deb822_repository needs ansible-core 2.15+, absent on 22.04).
+      ansible.builtin.template:
+        src: docker.sources.j2
+        dest: /etc/apt/sources.list.d/docker.sources
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      register: docker_repo
+
+    - name: Install Docker Engine packages
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+        install_recommends: false
+        update_cache: "{{ docker_repo.changed }}"
+      become: true
+
+    - name: Ensure the docker service is enabled and running
+      # MODULE CHOICE: systemd rather than `command: systemctl start docker`.
+      # The module is idempotent and reports "ok" when the service is already
+      # in the desired state, which a raw command could not do.
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+      become: true
+
+    - name: Add the user to the docker group - {{ docker_user }}
+      # append: true is essential. Without it, this REPLACES all of the
+      # user's supplementary groups -- which would silently strip sudo, and
+      # is a genuinely dangerous mistake to make on your own machine.
+      ansible.builtin.user:
+        name: "{{ docker_user }}"
+        groups: docker
+        append: true
+      become: true
+      register: docker_group
+
+    - name: Record whether a re-login is needed for group membership
+      ansible.builtin.set_fact:
+        docker_relogin_required: "{{ docker_group.changed }}"

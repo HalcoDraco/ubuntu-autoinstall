@@ -9,3 +9,11 @@ mise_signing_key_url: "https://mise.jdx.dev/gpg-key.pub"
 mise_keyring_path: "/etc/apt/keyrings/mise.asc"
 # Where mise puts the shims that make `java` resolve.
 mise_shims_path: "{{ ansible_facts['env'].HOME }}/.local/share/mise/shims"
+
+# Where the tool list lives. Under your home, not /etc: mise is a per-user
+# tool manager and the JDK is installed into your home directory.
+mise_config_dir: "{{ ansible_facts['env'].HOME }}/.config/mise"
+
+# Fallback; the real list is mise_tools in group_vars/all.yml.
+mise_tools:
+  java: "latest"

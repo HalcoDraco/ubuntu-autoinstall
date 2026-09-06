@@ -63,17 +63,37 @@
       - "   you are doing, including this playbook run."
       - ""
 
+    # Each section below is gated on what this run ACTUALLY did, not on what
+    # is merely enabled: the Docker re-login note appears only if group
+    # membership really changed, the MOK note only if a driver was really
+    # installed. A checklist listing steps you do not need trains you to
+    # ignore it.
+    #
+    # NOTE: this must stay a pure expression. Inside a ">-" folded scalar a
+    # "#" is literal text, not a comment -- putting one in here appends a
+    # string to a list and fails at render time.
     manual_steps_conditional: >-
       {{
-        (secureboot_steps if (manual_steps_secureboot_enabled | bool and nvidia_gpu_present | bool) else [])
-        + (docker_steps if (install_docker | bool) else [])
-        + (snap_steps if (ansible_facts['distribution_version'] is version('26.04', '>=')) else [])
+        (secureboot_steps
+           if (manual_steps_secureboot_enabled | bool
+               and nvidia_reboot_required | default(false) | bool)
+           else [])
+        + (docker_steps
+           if (docker_relogin_required | default(false) | bool)
+           else [])
+        + (java_steps
+           if (mise_config is defined and mise_config.changed | default(false))
+           else [])
+        + (snap_steps
+           if (ansible_facts['distribution_version'] is version('26.04', '>='))
+           else [])
       }}
 
     secureboot_steps:
-      - "* SECURE BOOT -- MOK ENROLLMENT (Secure Boot is ENABLED here)"
-      - "   If the NVIDIA driver was just installed, the DKMS kernel module"
-      - "   is unsigned and Secure Boot will refuse to load it."
+      - "* SECURE BOOT -- MOK ENROLLMENT (REQUIRED, driver just installed)"
+      - "   Secure Boot is enabled and an NVIDIA driver was just installed."
+      - "   Its DKMS kernel module is unsigned, so Secure Boot will refuse to"
+      - "   load it until you enroll the key."
       - "   You will be asked to set a one-time password during install, then"
       - "   at the NEXT BOOT a blue MOK Manager screen appears:"
       - "     Enroll MOK > Continue > Yes > enter that password > Reboot"
@@ -86,6 +106,15 @@
       - "   Group membership is only read when a session starts, so `docker`"
       - "   without sudo will not work until you log out and back in."
       - "   Check with: id -nG | tr ' ' '\\n' | grep docker"
+      - ""
+
+    java_steps:
+      - "* JAVA -- OPEN A NEW TERMINAL"
+      - "   mise installed a JDK and added its shims to ~/.profile, but your"
+      - "   CURRENT shell already has its PATH set. `java` will work in any"
+      - "   new terminal, and in apps launched from the GNOME menu after your"
+      - "   next login."
+      - "   Check with: java -version"
       - ""
 
     snap_steps:

@@ -1,0 +1,11 @@
+# Managed by ubuntu-autoinstall (roles/mise). Do not edit by hand.
+#
+# Note there is no Ubuntu codename here: mise publishes one "stable" suite for
+# every release (verified -- its Release file says Suite: stable). That makes
+# this repo definition immune to Ubuntu upgrades by construction, which is why
+# mise was chosen over a PPA.
+Types: deb
+URIs: {{ mise_repo_uri }}
+Suites: {{ mise_repo_suite }}
+Components: {{ mise_repo_component }}
+Signed-By: {{ mise_keyring_path }}
