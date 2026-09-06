@@ -184,6 +184,19 @@ cmd_run() {
              ansible-playbook local.yml ${*:-}"
 }
 
+cmd_bootstrap() {
+    # Runs the repo exactly the way a human would on a fresh machine:
+    # ./bootstrap.sh, which installs ansible, resolves collections and runs
+    # the playbook. This is the path that matters; cmd_run bypasses it.
+    is_running || die "VM is not running. ./vm/vm-helper.sh start"
+    say "Copying the repo into the VM"
+    ssh_cmd "rm -rf ~/ubuntu-autoinstall && mkdir -p ~/ubuntu-autoinstall"
+    tar -C "$REPO_DIR" --exclude=.git --exclude=.venv --exclude=vm -cf - . \
+        | ssh_cmd "tar -C ~/ubuntu-autoinstall -xf -"
+    say "Running ./bootstrap.sh inside the VM"
+    ssh_cmd "cd ~/ubuntu-autoinstall && ./bootstrap.sh ${*:-}"
+}
+
 cmd_reset() {
     say "Reverting to a pristine machine"
     is_running && cmd_stop
@@ -207,7 +220,8 @@ case "${1:-}" in
     stop)    shift; cmd_stop "$@" ;;
     status)  shift; cmd_status "$@" ;;
     ssh)     shift; cmd_ssh "$@" ;;
-    run)     shift; cmd_run "$@" ;;
+    run)       shift; cmd_run "$@" ;;
+    bootstrap) shift; cmd_bootstrap "$@" ;;
     desktop) shift; cmd_desktop "$@" ;;
     reset)   shift; cmd_reset "$@" ;;
     destroy) shift; cmd_destroy "$@" ;;

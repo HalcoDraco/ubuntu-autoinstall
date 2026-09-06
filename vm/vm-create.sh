@@ -101,7 +101,9 @@ users:
 
 package_update: true
 packages:
-  - ansible
+  # ONLY git, deliberately. A real fresh Ubuntu desktop has no ansible and no
+  # make, so bootstrap.sh must install what it needs. Pre-installing ansible
+  # here would hide a broken bootstrap.
   - git
 
 # Make the console usable if you ever attach to it for debugging.
