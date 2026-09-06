@@ -145,7 +145,7 @@
 - name: Show which JDK is now active
   ansible.builtin.debug:
     msg: >-
-      {{ (mise_java_version.stderr | default('') | trim | split('\n') | first)
+      {{ (mise_java_version.stderr_lines | default([]) | first | default('java installed'))
          if mise_java_version.rc | default(1) == 0
          else 'java not reporting a version yet -- open a new terminal, or check `mise ls`.' }}
   tags: [mise]

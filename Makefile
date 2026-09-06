@@ -16,8 +16,10 @@ ANSIBLE_LINT := $(shell [ -x $(VENV)/bin/ansible-lint ] && echo $(VENV)/bin/ansi
 help: ## Show this help
 	grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-deps: ## Install pinned galaxy collections from requirements.yml
-	ansible-galaxy install -r requirements.yml
+deps: ## Install pinned galaxy collections, only if actually missing
+	@ansible-doc community.general.snap >/dev/null 2>&1 \
+	  && echo "community.general already available - nothing to do" \
+	  || ansible-galaxy install -r requirements.yml
 
 syntax: ## Parse the playbook without running anything
 	$(ANSIBLE_PLAYBOOK) --syntax-check local.yml

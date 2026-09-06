@@ -175,7 +175,13 @@ cmd_run() {
     say "Running the playbook inside the VM"
     # No -K needed: cloud-init gave this user password-less sudo in the VM.
     # On a real machine you WILL be prompted; that is intentional.
-    ssh_cmd "cd ~/ubuntu-autoinstall && ansible-galaxy install -r requirements.yml && ansible-playbook local.yml ${*:-}"
+    # Mirror bootstrap.sh: only fetch from galaxy when the collection is
+    # genuinely absent. Installing the pinned newer community.general on top
+    # of Ubuntu's bundled one breaks ansible 2.10 on 22.04.
+    ssh_cmd "cd ~/ubuntu-autoinstall && \
+             { ansible-doc community.general.snap >/dev/null 2>&1 \
+               || ansible-galaxy install -r requirements.yml; } && \
+             ansible-playbook local.yml ${*:-}"
 }
 
 cmd_reset() {

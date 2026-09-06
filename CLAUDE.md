@@ -130,9 +130,18 @@ Runtime uses the system Ansible that `bootstrap.sh` installs.
 
 ## Current status
 
-Done: `base`, `packages`, `chrome`, `manual_steps`. Scaffolded: `keyboard`
-(working placeholder layout; real mappings pending from the user).
-Stubs awaiting implementation: `docker`, `nvidia`, `mise`.
+All roles implemented: `base`, `packages`, `chrome`, `docker`, `nvidia`,
+`mise`, `keyboard`, `manual_steps`.
+
+Gotchas discovered the hard way, do not regress these:
+- Inside a `>-` folded YAML scalar, `#` is literal text, NOT a comment.
+  Putting one in an expression appends a string to a list and fails at render.
+- `mise install` always exits 0, so `changed_when` must be derived by diffing
+  requested tools against `mise ls --installed --json`, never from output text.
+- `ansible.builtin.user` needs `append: true` when adding a supplementary
+  group. Omitting it REPLACES all groups and would strip `sudo`.
+- Docker publishes per-codename repos and can lag a new Ubuntu release, so the
+  role HEAD-checks the repo before writing a source file.
 
 The keyboard layout now contains the user's REAL 14 key mappings, recovered by
 diffing their hand-edited `/usr/share/X11/xkb/symbols/us` against the pristine

@@ -53,9 +53,21 @@ else
     say "ansible already present: $(ansible --version | head -1)"
 fi
 
-# --- install pinned galaxy dependencies ------------------------------------
-say "Installing pinned collections from requirements.yml"
-ansible-galaxy install -r requirements.yml
+# --- install pinned galaxy dependencies, ONLY if actually needed -----------
+# The Ubuntu `ansible` package bundles community.general already, at a version
+# matched to the ansible it ships. Installing the pinned newer one on top is
+# not just redundant -- on 22.04 (ansible 2.10) it actively BREAKS things:
+# community.general 13.x cannot be parsed by that runtime and every snap and
+# dconf task dies with "error parsing collection metadata".
+#
+# So: use what is already there, and only fetch from galaxy if it is missing
+# (which is the case for a bare ansible-core install).
+if ansible-doc community.general.snap >/dev/null 2>&1; then
+    say "community.general already available -- skipping galaxy install"
+else
+    say "community.general missing; installing pinned version from requirements.yml"
+    ansible-galaxy install -r requirements.yml
+fi
 
 # --- run ----------------------------------------------------------------
 # -K  == --ask-become-pass: prompt once for the sudo password, so the tasks

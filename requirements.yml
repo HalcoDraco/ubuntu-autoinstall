@@ -14,9 +14,18 @@
 # the repo also works with a bare `ansible-core`.
 # ---------------------------------------------------------------------------
 
+# WARNING, learned by testing on 22.04: do NOT install this unconditionally.
+# Ubuntu's `ansible` apt package already bundles community.general at a
+# version matched to the ansible it ships. Installing this newer pin on top
+# of 22.04's ansible 2.10 makes every snap and dconf task fail with
+# "error parsing collection metadata: unhashable type".
+#
+# bootstrap.sh therefore only installs this when the collection is genuinely
+# missing, which is the case for a bare ansible-core install.
+
 collections:
-  # Provides community.general.snap, used by roles/packages and roles/spotify.
-  # ansible-core alone has no snap module.
+  # Provides community.general.snap and community.general.dconf, used by
+  # roles/packages and roles/keyboard. ansible-core alone has neither.
   - name: community.general
     version: "13.3.0"
 

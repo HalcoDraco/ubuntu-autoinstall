@@ -303,12 +303,71 @@ untestable. It would only cover the apt layer.
 | `chrome` | `chrome` | **Done** — Google's repo + the `repo_add_once` fix |
 | `keyboard` | `keyboard` | **Done** — your 14 real key mappings, compile-verified |
 | `manual_steps` | `manual_steps` | **Done** — prints the checklist |
-| `docker` | `docker` | Stub — next session |
-| `nvidia` | `nvidia` | Stub — next session |
-| `mise` | `mise` | Stub — next session |
+| `docker` | `docker` | **Done** — Docker Engine from Docker's repo, user added to `docker` group |
+| `nvidia` | `nvidia` | **Done** — `ubuntu-drivers install`, triple-guarded |
+| `mise` | `mise` | **Done** — latest JDK, no version hardcoded |
 
 **Firefox is deliberately left untouched.** Nothing in this repo removes,
 modifies or reconfigures it.
+
+### Java / mise
+
+`mise` installs the newest JDK at the time it runs — nothing names a version,
+so this cannot rot. The tool list is `mise_tools` in `group_vars/all.yml`:
+
+```yaml
+mise_tools:
+  java: "latest"     # or "lts" if you prefer long-term-support releases
+```
+
+Adding another language later is a one-line edit there (`node: "latest"`).
+
+Two things worth knowing:
+
+- **`java` appears in new terminals, not your current one.** The shims are
+  added to `PATH` via `~/.profile`, which is read at login. This is
+  deliberate: a `~/.bashrc` hook (what `mise activate` installs) only affects
+  terminals, so apps launched from the GNOME menu would not find Java.
+- **It installs the latest JDK once; it does not chase new releases.** The
+  role only installs a tool that is missing, so re-running will not silently
+  swap your JDK. To move to a newer one: `mise upgrade java`.
+- A mise JDK is a **user-level** install. `java` works, but an apt package
+  declaring `Depends: default-jre` will not see it. If you ever need that, add
+  a system JDK to `apt_packages`.
+
+### Docker
+
+Docker Engine (not Docker Desktop) from Docker's official repository, with
+your user added to the `docker` group so `sudo` is not needed.
+
+> **The `docker` group grants effective root.** Any member can run
+> `docker run -v /:/host ...` and edit any file on the system. That is the
+> standard trade-off for password-less Docker, but it is worth knowing rather
+> than discovering.
+
+You must **log out and back in** before `docker` works without `sudo` — group
+membership is only read when a session starts. The playbook tells you this,
+but only when the membership actually changed.
+
+The role checks that Docker publishes a repo for your Ubuntu release before
+writing anything. Docker can lag weeks behind a new release; without that
+check the failure is a broken source file that breaks every later `apt`
+command.
+
+### NVIDIA
+
+Only runs when `nvidia_gpu_present: true` in that machine's `host_vars`, and
+then only acts if **both** an NVIDIA device is really on the PCI bus **and**
+`nvidia-smi` does not already report a working driver. So it is a no-op on an
+already-working machine, and cannot fire on the laptop.
+
+It uses `ubuntu-drivers install` — Ubuntu's own tool, which picks the right
+driver for your card and kernel. Naming `nvidia-driver-580` instead would be
+wrong by the next release.
+
+If Secure Boot is on and a driver was *actually installed*, the checklist
+prints the MOK enrollment steps. That part cannot be scripted: it is a
+pre-boot firmware screen requiring physical presence.
 
 ### The keyboard layout
 

@@ -92,7 +92,11 @@
       # MODULE CHOICE: systemd rather than `command: systemctl start docker`.
       # The module is idempotent and reports "ok" when the service is already
       # in the desired state, which a raw command could not do.
-      ansible.builtin.systemd_service:
+      #
+      # NOTE the module name: `systemd`, not `systemd_service`. The latter is
+      # the newer name but only exists from ansible-core 2.17, so it fails
+      # outright on 22.04's ansible 2.10. `systemd` works on every version.
+      ansible.builtin.systemd:
         name: docker
         state: started
         enabled: true
