@@ -16,6 +16,10 @@ set -euo pipefail
 VM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$VM_DIR")"
 
+# Optional local overrides (release, memory, cpus). Not in git.
+# Create vm/vm.env with e.g.:  UBUNTU_RELEASE=resolute
+[[ -f "${VM_DIR}/vm.env" ]] && . "${VM_DIR}/vm.env"
+
 UBUNTU_RELEASE="${UBUNTU_RELEASE:-noble}"
 BASE_IMG="${VM_DIR}/base-${UBUNTU_RELEASE}.img"
 DISK="${VM_DIR}/disk.qcow2"
@@ -109,21 +113,57 @@ cmd_ssh() { is_running || die "VM is not running. ./vm/vm-helper.sh start"; ssh_
 
 cmd_desktop() {
     is_running || die "VM is not running. ./vm/vm-helper.sh start"
-    say "Installing GNOME inside the VM (~1.5 GB, several minutes)"
+    say "Installing GNOME inside the VM (~1.5 GB, 10-20 minutes)"
     # WHY: the cloud image is a server image with no GNOME, no D-Bus session
     # bus and no display manager. The keyboard and gsettings roles cannot be
-    # tested without a real user session. Autologin gives us one on boot,
-    # which is what makes those roles testable over SSH.
-    ssh_cmd sudo DEBIAN_FRONTEND=noninteractive apt-get update
-    ssh_cmd sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ubuntu-desktop-minimal
+    # tested without a real user session. Autologin gives us one on boot.
+    #
+    # WHY systemd-run AND NOT A PLAIN ssh COMMAND:
+    # Running a 15-minute apt directly over SSH means the install dies with
+    # SIGHUP if the connection drops -- which can leave dpkg half-configured
+    # and the VM unreachable. (That is exactly what happened the first time.)
+    # systemd-run launches it as a transient unit owned by the VM's init, so
+    # it survives disconnects and we can poll it independently.
+    #
+    # NEEDRESTART_SUSPEND=1 is the other half of the fix: installing a desktop
+    # pulls in needrestart, which helpfully restarts systemd-networkd and
+    # systemd-resolved -- severing the very SSH connection driving the install.
+    # Suspending it keeps the network up.
+    ssh_cmd "sudo systemctl reset-failed desktop-install 2>/dev/null; \
+             sudo systemd-run --unit=desktop-install --collect \
+               --setenv=DEBIAN_FRONTEND=noninteractive \
+               --setenv=NEEDRESTART_SUSPEND=1 \
+               bash -c 'apt-get update && apt-get install -y ubuntu-desktop-minimal'" >/dev/null
+
+    say "Waiting for the install to finish (polling the unit, not holding a connection)"
+    for i in $(seq 1 120); do
+        state=$(ssh_cmd "systemctl show -p SubState --value desktop-install 2>/dev/null" 2>/dev/null || echo "unreachable")
+        case "$state" in
+            dead|failed) break ;;
+            unreachable) printf 'x' ;;
+            *) printf '.' ;;
+        esac
+        sleep 15
+    done
+    echo
+
+    result=$(ssh_cmd "systemctl show -p Result --value desktop-install 2>/dev/null" 2>/dev/null || echo unknown)
+    if ! ssh_cmd "test -x /usr/bin/gnome-shell" 2>/dev/null; then
+        die "GNOME did not install (unit result: ${result}). Inspect with:
+       ./vm/vm-helper.sh ssh 'journalctl -u desktop-install --no-pager | tail -40'"
+    fi
+    say "GNOME installed."
+
     say "Enabling autologin so a GNOME session (and its D-Bus bus) exists at boot"
     ssh_cmd "sudo install -d /etc/gdm3 && printf '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin=${VM_USER}\n' | sudo tee /etc/gdm3/custom.conf >/dev/null"
+
     say "Rebooting into the desktop"
-    ssh_cmd sudo reboot || true
-    sleep 10
-    for _ in $(seq 1 90); do ssh_cmd true 2>/dev/null && break; sleep 2; printf '.'; done
-    say "Desktop ready. Verify the session bus with:"
-    printf '     ./vm/vm-helper.sh ssh "echo \$DBUS_SESSION_BUS_ADDRESS; loginctl list-sessions"\n'
+    ssh_cmd "sudo systemd-run --on-active=1 --collect systemctl reboot" >/dev/null 2>&1 || true
+    sleep 20
+    for _ in $(seq 1 60); do ssh_cmd true 2>/dev/null && break; sleep 5; printf '.'; done
+    echo
+    say "Desktop ready. Session check:"
+    ssh_cmd "loginctl list-sessions --no-legend 2>/dev/null | head -3; echo '--- gnome-shell running? ---'; pgrep -c gnome-shell || echo 0"
 }
 
 cmd_run() {

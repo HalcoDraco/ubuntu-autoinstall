@@ -33,3 +33,4 @@ vm/meta-data
 vm/qemu.pid
 vm/console.log
 vm/base-*.img
+vm/vm.env

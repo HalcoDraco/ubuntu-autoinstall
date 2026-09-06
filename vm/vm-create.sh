@@ -29,6 +29,10 @@ VM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The Ubuntu release to test against. Override to test 26.04 when it is out:
 #   UBUNTU_RELEASE=<codename> ./vm/vm-create.sh
+# Optional local overrides (release, memory, cpus). Not in git.
+# Create vm/vm.env with e.g.:  UBUNTU_RELEASE=resolute
+[[ -f "${VM_DIR}/vm.env" ]] && . "${VM_DIR}/vm.env"
+
 UBUNTU_RELEASE="${UBUNTU_RELEASE:-noble}"
 
 BASE_IMG="${VM_DIR}/base-${UBUNTU_RELEASE}.img"
