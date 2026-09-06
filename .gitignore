@@ -33,4 +33,7 @@ vm/meta-data
 vm/qemu.pid
 vm/console.log
 vm/base-*.img
+# Partial downloads. *.img alone does NOT match "base-resolute.img.part",
+# which is how a 348 MB blob once got committed and blocked the push.
+*.part
 vm/vm.env
