@@ -1,0 +1,17 @@
+---
+# Role defaults have the LOWEST precedence of any variable in Ansible, which
+# makes them the right place for "sensible value someone may want to override".
+# Anything in group_vars/all.yml or host_vars/ beats these.
+
+# Packages Ansible itself and this repo depend on. These are deliberately NOT
+# in group_vars/all.yml's editable apt_packages list: deleting python3 from a
+# list should not be able to break the tool that is reading the list.
+base_packages:
+  - python3
+  - python3-pip
+  - python3-venv
+  - ca-certificates   # required to verify HTTPS apt repos
+  - curl              # used to fetch repo signing keys
+  - gnupg             # used to handle those keys
+  - git               # ansible-pull needs it; also generally essential
+  - python3-psutil    # community.general.dconf uses it to find your D-Bus session

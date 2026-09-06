@@ -1,0 +1,34 @@
+---
+# ===========================================================================
+# nvidia -- STUB. Implemented in a follow-up session.
+#
+# This role only runs at all when host_vars sets nvidia_gpu_present: true
+# (see local.yml). The tasks below add a SECOND, independent check against the
+# actual PCI bus, so that a mistaken host variable cannot cause a driver
+# install on a machine with no NVIDIA card.
+#
+# PLANNED IMPLEMENTATION:
+#   1. Detect the card:  lspci -d {{ nvidia_pci_vendor_id }}:
+#      as a read-only command with changed_when: false
+#   2. Detect an existing working driver (nvidia-smi succeeds) and skip if so,
+#      per your "skip if a suitable driver is already installed" requirement
+#   3. Otherwise run `ubuntu-drivers install`
+#      -- Ubuntu's own tool, which picks the right driver for the card and
+#      the running kernel. Far more durable than naming nvidia-driver-XXX,
+#      which is a versioned package name and would rot exactly the way you
+#      said you did not want.
+#   4. Detect whether Secure Boot is on and, if so, flag MOK enrollment for
+#      the manual-steps checklist -- it needs a password set at install time
+#      and a blue enrollment screen at the next boot. Genuinely not scriptable.
+#
+# NOTE for this machine: Niaura-linux already has driver 595.84 with DKMS
+# modules built for three kernels and Secure Boot enabled, so a correct
+# implementation must no-op here entirely.
+# ===========================================================================
+
+- name: Report that the nvidia role is not yet implemented
+  ansible.builtin.debug:
+    msg:
+      - "SKIPPED: nvidia role is a stub -- scheduled for a follow-up session."
+      - "No driver was installed and no kernel module was touched."
+  tags: [nvidia]

@@ -1,0 +1,11 @@
+---
+# mise's official APT repository. Verified codename-free: the Release file
+# reports Suite: stable / Codename: stable / Components: main, so this repo
+# definition cannot rot across an Ubuntu upgrade.
+mise_repo_uri: "https://mise.jdx.dev/deb"
+mise_repo_suite: "stable"
+mise_repo_component: "main"
+mise_signing_key_url: "https://mise.jdx.dev/gpg-key.pub"
+mise_keyring_path: "/etc/apt/keyrings/mise.asc"
+# Where mise puts the shims that make `java` resolve.
+mise_shims_path: "{{ ansible_env.HOME }}/.local/share/mise/shims"

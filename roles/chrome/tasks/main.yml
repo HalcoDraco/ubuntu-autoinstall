@@ -1,0 +1,101 @@
+---
+# ===========================================================================
+# chrome -- Google Chrome from Google's own APT repository.
+#
+# WHY A ROLE AND NOT A LINE IN apt_packages:
+# Chrome is not in Ubuntu's repositories. It needs a third-party repo and a
+# signing key, which is real logic -- exactly the line I drew for VLC.
+#
+# THE IDEMPOTENCY TRAP (this is the interesting part):
+# The google-chrome-stable package rewrites its own apt source file. Its
+# postinst, and a daily cron job at /opt/google/chrome/cron/google-chrome,
+# re-add the repository unless told not to. If we manage the source file
+# ourselves without disabling that, Chrome silently rewrites it and this role
+# reports "changed" on every single run, forever.
+#
+# The fix is /etc/default/google-chrome with repo_add_once="false", which is
+# Google's own documented opt-out. We write it BEFORE installing the package
+# so the postinst sees it on first install.
+# ===========================================================================
+
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+  tags: [chrome]
+
+- name: Fetch Google's package signing key
+  ansible.builtin.get_url:
+    url: "{{ chrome_signing_key_url }}"
+    dest: "{{ chrome_keyring_path }}"
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  # get_url is idempotent: with the default force=false it issues a
+  # conditional request and only reports "changed" if the key actually
+  # changed upstream. No creates:/changed_when: gymnastics needed.
+  tags: [chrome]
+
+- name: Tell the Chrome package not to manage its own apt source
+  # Must come BEFORE the package is installed, or the postinst adds a second,
+  # duplicate source file on first install.
+  ansible.builtin.copy:
+    dest: /etc/default/google-chrome
+    mode: "0644"
+    owner: root
+    group: root
+    content: |
+      # Managed by ubuntu-autoinstall (roles/chrome).
+      # The apt repository for Chrome is defined by Ansible in
+      # /etc/apt/sources.list.d/google-chrome.sources. These two settings stop
+      # the Chrome package from re-adding it behind Ansible's back, which
+      # would make this role report a change on every run.
+      repo_add_once="false"
+      repo_reenable_on_distupgrade="false"
+  become: true
+  tags: [chrome]
+
+- name: Add the Google Chrome apt repository
+  # MODULE CHOICE: deb822_repository, not apt_repository.
+  #
+  # apt_repository writes the old one-line format:
+  #     deb [signed-by=...] https://... stable main
+  # which is deprecated and which APT 3 (Ubuntu 26.04) warns about.
+  #
+  # deb822_repository writes the modern .sources format that your machine
+  # already uses for docker and chrome, and it takes each field as a proper
+  # parameter instead of making us build a string by concatenation. For repos
+  # that DO need a codename, that means writing
+  #     suites: "{{ ansible_distribution_release }}"
+  # rather than splicing it into a line -- which is the mechanism that keeps
+  # this repo version-agnostic.
+  ansible.builtin.deb822_repository:
+    name: google-chrome          # -> /etc/apt/sources.list.d/google-chrome.sources
+    types: [deb]
+    uris: "{{ chrome_repo_uri }}"
+    suites: "{{ chrome_repo_suite }}"
+    components: "{{ chrome_repo_component }}"
+    architectures: [amd64]       # Google ships amd64 only for Chrome on Linux
+    signed_by: "{{ chrome_keyring_path }}"
+    enabled: true
+    state: present
+  become: true
+  register: chrome_repo
+  tags: [chrome]
+
+- name: Install Google Chrome
+  ansible.builtin.apt:
+    name: "{{ chrome_package }}"
+    state: present
+    install_recommends: false
+    # Refresh the package index only when the repo definition just changed.
+    # Unconditionally updating the cache here would slow every run down for
+    # no reason.
+    update_cache: "{{ chrome_repo.changed }}"
+  become: true
+  tags: [chrome]

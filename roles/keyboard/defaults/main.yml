@@ -1,0 +1,11 @@
+---
+# Where xkeyboard-config expects a user-defined layout to live. This path is
+# reserved for exactly this purpose; see the header of files/custom.
+keyboard_custom_symbols_path: /usr/share/X11/xkb/symbols/custom
+
+# Fallbacks; the real values live in group_vars/all.yml.
+keyboard_layouts:
+  - custom
+  - es
+keyboard_switch_keys: ["<Super>space"]
+keyboard_switch_backward_keys: ["<Shift><Super>space"]

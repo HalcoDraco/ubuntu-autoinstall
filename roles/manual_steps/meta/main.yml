@@ -1,0 +1,14 @@
+---
+# Minimal metadata. These roles are private to this repo and never published
+# to Ansible Galaxy, so there is no galaxy_info block.
+galaxy_info:
+  author: Pablo Gonzalez Monfort
+  description: "ubuntu-autoinstall role: manual_steps"
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags: []
+dependencies: []

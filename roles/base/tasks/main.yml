@@ -1,0 +1,37 @@
+---
+# ===========================================================================
+# base -- prerequisites everything else assumes.
+#
+# MODULE CHOICE: ansible.builtin.apt, not ansible.builtin.package.
+# `package` is the generic wrapper that picks apt/dnf/pacman for you, and it
+# is the right call for a distro-agnostic repo. This repo is Ubuntu-only by
+# design, and `apt` gives us apt-specific controls we actually use:
+# cache_valid_time and install_recommends. Using `package` would mean giving
+# those up for portability we explicitly said we do not need.
+#
+# (Swapping the package layer later is still cheap: it is this one module name
+# in a handful of roles, which is exactly why package installs are isolated
+# into roles rather than scattered through the playbook.)
+# ===========================================================================
+
+- name: Update the apt package index
+  ansible.builtin.apt:
+    update_cache: true
+    # Only actually hit the network if the cache is older than an hour.
+    # This is what keeps repeated runs fast AND idempotent: a second run
+    # within the hour reports "ok" rather than "changed".
+    cache_valid_time: 3600
+  become: true
+  tags: [base, packages]
+
+- name: Install base system packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+    # Passing the whole list to one task (rather than looping) means ONE apt
+    # transaction instead of N. It is faster and it is what apt is built for.
+    install_recommends: false
+    # Ubuntu pulls in a lot of "recommended" extras by default. Saying no
+    # keeps a fresh install lean, which is the entire point of reinstalling.
+  become: true
+  tags: [base]

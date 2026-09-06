@@ -1,0 +1,33 @@
+---
+# ---------------------------------------------------------------------------
+# ansible-lint configuration.
+#
+# Run with: make lint
+#
+# "production" is the strictest built-in profile. Starting strict and relaxing
+# deliberately is easier than starting loose and never tightening.
+# ---------------------------------------------------------------------------
+profile: production
+
+exclude_paths:
+  - .venv/
+  - collections/
+  - .git/
+
+# Roles here are named `base`, `docker`, ... rather than the galaxy-style
+# `namespace.rolename`, because they are private to this repo and never
+# published. That is what role-name / galaxy rules would otherwise complain about.
+skip_list:
+  # We do not ship a galaxy_info block; these roles are not published.
+  - galaxy[no-changelog]
+  - galaxy[version-incorrect]
+
+# Treat these as errors rather than warnings -- they are the rules that keep
+# the repo idempotent and rerunnable, which is the whole point.
+enable_list:
+  - no-changed-when
+  - no-handler
+  - fqcn
+
+kinds:
+  - playbook: "local.yml"

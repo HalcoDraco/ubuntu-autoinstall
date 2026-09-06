@@ -1,0 +1,100 @@
+---
+# ===========================================================================
+# manual_steps -- prints what genuinely cannot be automated.
+#
+# This role changes NOTHING. It exists because a checklist you can trust is
+# more useful than a script that pretends to have finished the job.
+#
+# Every entry here is something that is interactive by design (OAuth consent,
+# firmware enrollment) or that needs a new login session. If you find a way to
+# automate one of these, delete it from the list.
+# ===========================================================================
+
+- name: Check whether Secure Boot is enabled
+  ansible.builtin.command: mokutil --sb-state
+  register: manual_steps_secureboot
+  # THREE guards, and each earns its place -- this is the pattern to copy
+  # whenever you must reach for command: instead of a module:
+  changed_when: false     # a query changes nothing; without this Ansible
+                          # would report "changed" on every single run
+  failed_when: false      # mokutil is absent on machines without UEFI, and
+                          # that is not an error -- it just means "no"
+  check_mode: false       # still run this during --check, because it only
+                          # reads. Without it the fact is undefined in a
+                          # --check run and the report below breaks.
+  tags: [manual_steps]
+
+- name: Determine whether Secure Boot is on
+  ansible.builtin.set_fact:
+    manual_steps_secureboot_enabled: >-
+      {{ (manual_steps_secureboot.stdout | default('')) is search('SecureBoot enabled') }}
+  tags: [manual_steps]
+
+- name: Print the manual steps checklist
+  ansible.builtin.debug:
+    msg: "{{ manual_steps_header + manual_steps_always + manual_steps_conditional + manual_steps_footer }}"
+  vars:
+    manual_steps_header:
+      - "==========================================================="
+      - " MANUAL STEPS -- these cannot be automated"
+      - "==========================================================="
+      - ""
+
+    manual_steps_always:
+      - "1. GOOGLE ACCOUNT (GNOME Online Accounts)"
+      - "   Settings > Online Accounts > Google, then sign in."
+      - "   Why not automated: OAuth needs an interactive browser consent"
+      - "   screen and stores a token in your login keyring. There is no"
+      - "   headless path, and hardcoding credentials would be worse."
+      - ""
+      - "2. CHROME SYNC"
+      - "   Open Chrome > Sign in > enable sync."
+      - "   Why not automated: same OAuth consent flow, plus Chrome binds the"
+      - "   profile to your login keyring on first run."
+      - ""
+      - "3. KEYBOARD LAYOUT -- LOG OUT AND BACK IN"
+      - "   The custom layout is installed, and GNOME is pointed at it, but"
+      - "   GNOME compiles the keymap when your session STARTS. Until you log"
+      - "   out and back in, the new layout will not appear in the switcher."
+      - "   Why not automated: forcing a session restart would kill whatever"
+      - "   you are doing, including this playbook run."
+      - ""
+
+    manual_steps_conditional: >-
+      {{
+        (secureboot_steps if (manual_steps_secureboot_enabled | bool and nvidia_gpu_present | bool) else [])
+        + (docker_steps if (install_docker | bool) else [])
+        + (snap_steps if (ansible_distribution_version is version('26.04', '>=')) else [])
+      }}
+
+    secureboot_steps:
+      - "4. SECURE BOOT -- MOK ENROLLMENT (Secure Boot is ENABLED here)"
+      - "   If the NVIDIA driver was just installed, the DKMS kernel module"
+      - "   is unsigned and Secure Boot will refuse to load it."
+      - "   You will be asked to set a one-time password during install, then"
+      - "   at the NEXT BOOT a blue MOK Manager screen appears:"
+      - "     Enroll MOK > Continue > Yes > enter that password > Reboot"
+      - "   Why not automated: it is firmware-level, pre-boot, and by design"
+      - "   requires physical presence. That is the whole security property."
+      - ""
+
+    docker_steps:
+      - "5. DOCKER GROUP -- LOG OUT AND BACK IN"
+      - "   Group membership is only read when a session starts, so `docker`"
+      - "   without sudo will not work until you log out and back in."
+      - "   Check with: id -nG | tr ' ' '\\n' | grep docker"
+      - ""
+
+    snap_steps:
+      - "6. SNAP PERMISSION PROMPTS (Ubuntu 26.04+)"
+      - "   26.04 enables snap permission prompting by default. The first"
+      - "   time a confined snap touches your home directory you get a"
+      - "   dialog. Answer it once per app."
+      - "   Why not automated: it is a deliberate user-consent gate."
+      - ""
+
+    manual_steps_footer:
+      - "-----------------------------------------------------------"
+      - "NOTE: Firefox was deliberately left untouched by this playbook."
+      - "==========================================================="
+  tags: [manual_steps]

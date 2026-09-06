@@ -1,0 +1,30 @@
+---
+# ===========================================================================
+# docker -- STUB. Implemented in a follow-up session.
+#
+# PLANNED IMPLEMENTATION (hand-rolled, ~40 lines):
+#   1. get_url  Docker's GPG key -> {{ docker_keyring_path }}
+#   2. deb822_repository with suites: "{{ ansible_distribution_release }}"
+#   3. apt install {{ docker_packages }}
+#   4. systemd: enable + start docker
+#   5. user: append the invoking user to the "docker" group
+#
+# ROLE CHOICE -- hand-rolled vs geerlingguy.docker:
+# Leaning hand-rolled. That role carries Debian/RedHat/Fedora branching we do
+# not need, pins its own repo handling that we would have to audit on every
+# bump, and its Ubuntu-version logic is precisely the kind of thing that
+# breaks on a release as new as 26.04. Five explicit tasks we control beat a
+# dependency we must trust. Final call when it is written.
+#
+# SECURITY NOTE for when this is implemented: adding a user to the "docker"
+# group grants effective root (that user can `docker run -v /:/host` and edit
+# anything). That is the standard trade-off and what you asked for, but it is
+# worth stating plainly rather than burying.
+# ===========================================================================
+
+- name: Report that the docker role is not yet implemented
+  ansible.builtin.debug:
+    msg:
+      - "SKIPPED: docker role is a stub -- scheduled for a follow-up session."
+      - "Nothing was installed and no group membership was changed."
+  tags: [docker]

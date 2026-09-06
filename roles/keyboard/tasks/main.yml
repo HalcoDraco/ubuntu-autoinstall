@@ -1,0 +1,79 @@
+---
+# ===========================================================================
+# keyboard -- custom XKB layout + GNOME input source configuration.
+#
+# TWO HALVES, WITH DIFFERENT PRIVILEGE REQUIREMENTS. This is the subtlety
+# that makes this role worth reading carefully:
+#
+#   1. The symbols file lives under /usr/share and needs ROOT.
+#   2. The GNOME settings live in YOUR dconf database and must NOT be root.
+#      Running them as root writes root's settings: no error, no effect,
+#      and very confusing to debug.
+#
+# WHY NO setxkbmap / xkbcomp ANYWHERE IN THIS ROLE:
+# Those are X11 tools. Ubuntu 26.04 is Wayland-only -- there is no Xorg
+# session to talk to -- and this machine is already on Wayland today. All
+# desktop configuration therefore goes through gsettings/dconf, which is the
+# supported path on both.
+# ===========================================================================
+
+# ------------------------- 1. the layout (root) ---------------------------
+
+- name: Install the custom XKB symbols file
+  ansible.builtin.copy:
+    src: custom
+    dest: "{{ keyboard_custom_symbols_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  # `copy` compares checksums, so this is a no-op once the file matches.
+  # No package owns this path, so nothing will overwrite it on upgrade.
+  register: keyboard_symbols
+  tags: [keyboard]
+
+- name: Note that a re-login is required for a changed layout
+  # Purely informational. GNOME compiles the keymap when your session starts,
+  # so an edited symbols file does not take effect until you log back in.
+  # There is no supported way to force that from a script on Wayland.
+  ansible.builtin.set_fact:
+    keyboard_relogin_required: "{{ keyboard_symbols.changed }}"
+  tags: [keyboard]
+
+# ---------------------- 2. GNOME settings (NOT root) ----------------------
+# MODULE CHOICE: community.general.dconf rather than `command: gsettings set`.
+# dconf is idempotent -- it reads the current value first and reports "ok"
+# when nothing needs changing. A `command: gsettings set` would report
+# "changed" on every run and need a hand-written changed_when to fix.
+#
+# Values are GVariant literals, which is why the quoting below looks fussy:
+# dconf stores typed values, not strings.
+
+- name: Set the GNOME input sources
+  community.general.dconf:
+    key: "/org/gnome/desktop/input-sources/sources"
+    # Builds e.g.  [('xkb', 'custom'), ('xkb', 'es')]
+    # The FIRST entry is the layout you get at login.
+    value: "[{% for layout in keyboard_layouts %}('xkb', '{{ layout }}'){{ ', ' if not loop.last }}{% endfor %}]"
+    state: present
+  become: false
+  # ^ MUST be false. See the header of this file and of local.yml.
+  tags: [keyboard]
+
+- name: Bind the input-source switch shortcut
+  # Set explicitly rather than trusting the default, so a fresh machine
+  # cannot surprise you with a different binding.
+  community.general.dconf:
+    key: "/org/gnome/desktop/wm/keybindings/switch-input-source"
+    value: "{{ keyboard_switch_keys | to_json }}"
+    state: present
+  become: false
+  tags: [keyboard]
+
+- name: Bind the reverse input-source switch shortcut
+  community.general.dconf:
+    key: "/org/gnome/desktop/wm/keybindings/switch-input-source-backward"
+    value: "{{ keyboard_switch_backward_keys | to_json }}"
+    state: present
+  become: false
+  tags: [keyboard]

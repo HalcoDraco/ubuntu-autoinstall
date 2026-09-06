@@ -1,0 +1,13 @@
+---
+# ---------------------------------------------------------------------------
+# host_vars/Niaura-linux.yml -- the desktop.
+#
+# Anything set here overrides group_vars/all.yml for THIS machine only.
+# This is how per-machine variance works: one playbook, different variables,
+# never a forked copy of the playbook.
+# ---------------------------------------------------------------------------
+
+# This machine has an NVIDIA RTX 2060. The nvidia role additionally verifies
+# the hardware is really present before touching drivers, so setting this to
+# true on a machine without a GPU is safe -- it will skip with a message.
+nvidia_gpu_present: true

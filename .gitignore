@@ -1,0 +1,35 @@
+# Python virtualenv used only for linting/validation on the dev machine.
+# The real runtime uses the system Ansible installed by bootstrap.sh.
+.venv/
+
+# Ansible galaxy content is pinned in requirements.yml and installed on demand,
+# so the downloaded copies never belong in git.
+roles/galaxy/
+collections/
+
+# Ansible runtime noise
+*.retry
+.ansible/
+ansible.log
+
+# Local scratch / VM testing artefacts
+.vm/
+*.qcow2
+*.img
+*.iso
+seed.img
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# VM test harness artefacts
+vm/id_ed25519*
+vm/user-data
+vm/meta-data
+vm/qemu.pid
+vm/console.log
+vm/base-*.img

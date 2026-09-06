@@ -1,0 +1,11 @@
+---
+# Google's APT repository. Note there is no Ubuntu codename anywhere in here:
+# Google publishes a single "stable" suite for all Debian/Ubuntu releases, so
+# this repo definition is version-agnostic by construction and will not rot
+# when you move to 26.04.
+chrome_repo_uri: "https://dl.google.com/linux/chrome/deb/"
+chrome_repo_suite: "stable"
+chrome_repo_component: "main"
+chrome_signing_key_url: "https://dl.google.com/linux/linux_signing_key.pub"
+chrome_keyring_path: "/etc/apt/keyrings/google-chrome.asc"
+chrome_package: "google-chrome-stable"

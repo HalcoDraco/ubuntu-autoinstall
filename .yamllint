@@ -1,0 +1,35 @@
+---
+# ansible-lint delegates YAML style checks to yamllint, but it REQUIRES a few
+# specific settings and refuses to enable fix-mode without them. The four
+# rules below are those requirements, not personal preference.
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+
+  # Ansible playbooks conventionally indent list items under their key.
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+  # Required false by ansible-lint. It also lets us keep explanatory comments
+  # aligned to the thing they explain rather than to YAML nesting depth.
+  comments-indentation: false
+
+  comments:
+    min-spaces-from-content: 1
+
+  # The remaining three are mandated by ansible-lint.
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    # File modes must be quoted strings ("0644"), never bare 0644 -- YAML
+    # would silently read that as the decimal number 644.
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+
+ignore: |
+  .venv/
+  collections/

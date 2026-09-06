@@ -1,0 +1,23 @@
+---
+# ---------------------------------------------------------------------------
+# External dependencies, pinned to exact versions.
+#
+# WHY PIN: an unpinned galaxy dependency means a future `ansible-galaxy install`
+# can silently change behaviour on a machine you are trying to make
+# reproducible. That defeats the point of this repo.
+#
+# Install with:   make deps        (or) ansible-galaxy install -r requirements.yml
+#
+# IMPORTANT: `ansible-pull` does NOT install this file for you -- I checked the
+# source. The Ubuntu `ansible` apt package happens to bundle community.general,
+# so the documented bootstrap works, but bootstrap.sh installs it explicitly so
+# the repo also works with a bare `ansible-core`.
+# ---------------------------------------------------------------------------
+
+collections:
+  # Provides community.general.snap, used by roles/packages and roles/spotify.
+  # ansible-core alone has no snap module.
+  - name: community.general
+    version: "13.3.0"
+
+roles: []

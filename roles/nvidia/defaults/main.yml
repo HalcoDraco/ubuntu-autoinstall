@@ -1,0 +1,4 @@
+---
+# Vendor ID 10de is NVIDIA. Used to verify the hardware really is present
+# before touching drivers, independently of the host variable.
+nvidia_pci_vendor_id: "10de"

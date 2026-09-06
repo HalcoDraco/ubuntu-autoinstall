@@ -1,0 +1,84 @@
+---
+# ===========================================================================
+# THIS IS THE FILE YOU EDIT DAY TO DAY.
+#
+# Adding an application should be a one-line change here, never a code change
+# in roles/. If you find yourself editing a role to add an app, the app
+# probably belongs in one of the lists below instead.
+#
+# group_vars/all.yml applies to every machine. To vary something per machine,
+# override it in host_vars/<hostname>.yml -- host_vars wins over group_vars.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# APT PACKAGES
+# Plain packages from Ubuntu's own repositories. No third-party repo, no
+# signing key, no special logic -- just a name.
+#
+# VLC lives here rather than in a dedicated role on purpose: it is one package
+# name with no setup steps, so a whole role for it would be pure ceremony.
+# Anything needing its own repo/key (Chrome, Docker, mise) DOES get a role.
+#
+# These are seed entries. Delete freely.
+# ---------------------------------------------------------------------------
+apt_packages:
+  - vlc            # the media player you asked for
+  - htop           # process viewer
+  - tree           # directory listings
+  - ripgrep        # fast grep, used by lots of editors
+  - gnome-tweaks   # exposes GNOME settings the Settings app hides
+
+# ---------------------------------------------------------------------------
+# SNAP PACKAGES
+# Two lists because snap has two install modes and mixing them in one list
+# would mean every entry becoming a dict -- which breaks the "one-line edit" goal.
+#
+#   snap_packages          -> normal, strictly confined snaps
+#   snap_packages_classic  -> installed with --classic (full system access).
+#                             Editors and IDEs usually need this.
+#
+# NOTE for Ubuntu 26.04: snap permission prompting is ON by default, so the
+# first launch of a confined snap may pop a dialog. That is interactive and
+# cannot be scripted -- it is on the manual-steps checklist.
+# ---------------------------------------------------------------------------
+snap_packages:
+  - spotify        # the music player you asked for
+
+snap_packages_classic: []
+  # - code         # example: VS Code needs --classic
+
+# ---------------------------------------------------------------------------
+# FEATURE TOGGLES
+# Turn whole roles on or off. Override per machine in host_vars/.
+# ---------------------------------------------------------------------------
+install_chrome: true
+install_docker: true
+install_mise: true
+configure_keyboard: true
+
+# NVIDIA is driven by a host variable, never auto-enabled globally:
+# the laptop must skip it entirely. Default is false so an UNKNOWN machine
+# never tries to install a GPU driver it does not need.
+# host_vars/Niaura-linux.yml sets this to true.
+nvidia_gpu_present: false
+
+# ---------------------------------------------------------------------------
+# KEYBOARD
+# Order matters: the first entry is the layout you get at login.
+# "custom" is our own layout (see roles/keyboard); "es" is stock Spanish.
+# ---------------------------------------------------------------------------
+keyboard_layouts:
+  - custom
+  - es
+
+# GNOME's input-source switch shortcut. Set explicitly rather than relying on
+# the default, so a fresh machine cannot surprise you.
+keyboard_switch_keys: ["<Super>space"]
+keyboard_switch_backward_keys: ["<Shift><Super>space"]
+
+# ---------------------------------------------------------------------------
+# MISE / JDK  (implemented in a follow-up session; vars defined now so the
+# role stub and the docs agree)
+# ---------------------------------------------------------------------------
+mise_tools:
+  java: "latest"   # change to "lts" if you prefer long-term-support JDKs

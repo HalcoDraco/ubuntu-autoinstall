@@ -1,0 +1,124 @@
+---
+# ===========================================================================
+# local.yml -- the entry point.
+#
+# This is the file `ansible-pull` runs by default (that is why it is called
+# local.yml and lives at the repo root; ansible-pull looks for exactly this
+# name). It is also what `make run` and bootstrap.sh execute.
+#
+# ANSIBLE VOCABULARY, in the order you meet it below:
+#   play      - a block matching some hosts to some work. This file has one.
+#   hosts     - which machines from the inventory this play targets.
+#   pre_tasks - tasks that run BEFORE any role. Used here for sanity checks.
+#   roles     - reusable bundles of tasks. One per thing we configure.
+#   tags      - labels that let you run part of the playbook:
+#                 ansible-playbook local.yml --tags docker
+#   become    - "escalate privileges" i.e. run this bit with sudo.
+# ===========================================================================
+
+- name: Configure an Ubuntu desktop from scratch
+  hosts: all
+  # The inventory contains only localhost, so "all" means "this machine".
+  # See inventory/hosts.yml for why it is built that way.
+
+  gather_facts: true
+  # Collects facts about the machine (ansible_distribution_release, hostname,
+  # CPU, etc.) before running anything. We depend on several of these -- most
+  # importantly ansible_distribution_release, which is how we stay
+  # version-agnostic instead of hardcoding "noble" or "resolute".
+
+  become: false
+  # DEFAULT TO NOT ROOT. This is deliberate and it is the single most important
+  # line in this file.
+  #
+  # Desktop configuration (gsettings/dconf) MUST run as your own user, because
+  # those settings live in your user's dconf database and need your session's
+  # D-Bus. Running them as root writes root's settings, which does nothing
+  # visible and is maddening to debug.
+  #
+  # So: root is opt-in, per task, via `become: true`. Never play-wide.
+  #
+  # CONSEQUENCE: run this playbook AS YOURSELF with -K (prompt for the sudo
+  # password), NOT as `sudo ansible-playbook`. `become: false` cannot climb
+  # back down to your user from root -- if you start as root, the desktop
+  # tasks are silently wrong. The README repeats this warning.
+
+  pre_tasks:
+    # `tags: always` means these run even when you filter with --tags docker.
+    # Without it, `--tags docker` would skip loading host_vars and the run
+    # would use the wrong variables.
+
+    - name: Verify we are running on Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+        fail_msg: >-
+          This playbook targets Ubuntu only, but this machine reports
+          '{{ ansible_distribution }}'. Refusing to continue rather than
+          guess at package names.
+        success_msg: "Ubuntu {{ ansible_distribution_version }} ({{ ansible_distribution_release }}) detected."
+      tags: [always]
+
+    - name: Load per-machine variables
+      # This is the mechanism described in inventory/hosts.yml: we load
+      # host_vars/<hostname>.yml ourselves rather than relying on Ansible's
+      # automatic host_vars loading, so that an unknown machine still works.
+      #
+      # first_found returns the first file in the list that exists, so a
+      # machine with no file of its own falls back to default.yml.
+      ansible.builtin.include_vars:
+        file: "{{ lookup('ansible.builtin.first_found', candidate_var_files) }}"
+      vars:
+        candidate_var_files:
+          - "host_vars/{{ ansible_hostname }}.yml"
+          - "host_vars/default.yml"
+      tags: [always]
+
+    - name: Report which variable file was used
+      ansible.builtin.debug:
+        msg: >-
+          Host '{{ ansible_hostname }}' -- NVIDIA expected:
+          {{ nvidia_gpu_present }}. Edit host_vars/{{ ansible_hostname }}.yml
+          to change settings for this machine only.
+      tags: [always]
+
+  roles:
+    # Each role carries a tag so you can run just that part:
+    #   ansible-playbook local.yml -K --tags keyboard
+    # Multiple tags work too:
+    #   ansible-playbook local.yml -K --tags packages,chrome
+
+    - role: base
+      tags: [base]
+
+    - role: packages
+      tags: [packages]
+
+    - role: chrome
+      tags: [chrome]
+      when: install_chrome | bool
+
+    - role: docker
+      tags: [docker]
+      when: install_docker | bool
+
+    - role: nvidia
+      tags: [nvidia]
+      # Two guards, on purpose. The host variable expresses intent ("this
+      # machine has a GPU"); the role itself additionally verifies the
+      # hardware really is there before touching drivers.
+      when: nvidia_gpu_present | bool
+
+    - role: mise
+      tags: [mise]
+      when: install_mise | bool
+
+    - role: keyboard
+      tags: [keyboard]
+      when: configure_keyboard | bool
+
+    # Always last: prints the checklist of things that genuinely cannot be
+    # automated. Deliberately NOT tagged `always` -- if you run --tags docker
+    # you want the docker output, not a full checklist.
+    - role: manual_steps
+      tags: [manual_steps]

@@ -1,0 +1,64 @@
+---
+# ===========================================================================
+# packages -- installs the user-editable app lists from group_vars/all.yml.
+#
+# The whole point of this role is that adding an application is a one-line
+# edit to group_vars/all.yml and never a change to this file.
+#
+# WHY THIS ROLE HAS NO defaults/main.yml:
+# Role defaults are for role-specific tunables. These three lists are global
+# user configuration -- they belong to you, not to this role -- so they live
+# in group_vars/all.yml and nowhere else. Declaring them here as well would
+# duplicate the source of truth and would force them to be renamed
+# packages_apt_packages etc. to satisfy ansible-lint's role-prefix rule,
+# making the file you actually edit uglier for no gain.
+#
+# The `| default([])` filters below are the safety net that a defaults file
+# would otherwise have provided: if a list is missing entirely, the task
+# skips rather than failing.
+# ===========================================================================
+
+# --------------------------------- APT ------------------------------------
+
+- name: Install apt packages from the user list
+  ansible.builtin.apt:
+    name: "{{ apt_packages | default([]) }}"
+    state: present
+    install_recommends: false
+    cache_valid_time: 3600
+    update_cache: true
+  become: true
+  # `when` guards against an empty list: apt with name: [] is a no-op anyway,
+  # but skipping explicitly makes the run output honest about what happened.
+  when: apt_packages | default([]) | length > 0
+  tags: [packages, apt]
+
+# --------------------------------- SNAP -----------------------------------
+# MODULE CHOICE: community.general.snap rather than `command: snap install`.
+# The module is idempotent for free -- it checks whether the snap is already
+# present and reports "ok" instead of "changed". A raw `command:` would report
+# "changed" on every single run and would need manual changed_when handling.
+#
+# This is the one external collection this repo needs; it is pinned in
+# requirements.yml. Note that the Ubuntu `ansible` apt package bundles
+# community.general, so the documented bootstrap works out of the box.
+
+- name: Install strictly-confined snap packages
+  community.general.snap:
+    name: "{{ snap_packages | default([]) }}"
+    state: present
+  become: true
+  when: snap_packages | default([]) | length > 0
+  tags: [packages, snap]
+
+- name: Install classic snap packages
+  community.general.snap:
+    name: "{{ snap_packages_classic | default([]) }}"
+    state: present
+    classic: true
+    # `classic` disables snap's confinement. Editors and IDEs need it because
+    # they must reach files and toolchains all over the system. Never add it
+    # to a snap that does not require it.
+  become: true
+  when: snap_packages_classic | default([]) | length > 0
+  tags: [packages, snap]

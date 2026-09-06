@@ -1,0 +1,33 @@
+---
+# ===========================================================================
+# mise -- STUB. Implemented in a follow-up session.
+#
+# PLANNED IMPLEMENTATION:
+#   1. get_url the signing key, deb822_repository, apt install mise  (as root)
+#   2. Template {{ mise_tools }} from group_vars into ~/.config/mise/config.toml
+#      (as YOUR user, not root -- it is your home directory)
+#   3. Run `mise install` with a proper changed_when, keyed off whether the
+#      tool was already present
+#
+# WHY SHIMS ON PATH RATHER THAN `mise activate`:
+# `mise activate` installs a shell hook in ~/.bashrc, which only affects
+# interactive terminals. Anything launched from the GNOME menu -- an IDE, a
+# .desktop launcher -- would not see java at all. Adding
+# {{ mise_shims_path }} to PATH via ~/.profile covers both, because the
+# display manager sources ~/.profile at login.
+#
+# HONEST CAVEAT worth repeating in the README: a mise-managed JDK is a
+# USER-level install. `java` on the command line works, but an apt package
+# declaring `Depends: default-jre` will not see it. If you ever need a true
+# system JDK, add one to apt_packages in group_vars/all.yml.
+#
+# Setting java = "latest" gets the newest JDK release, including non-LTS ones.
+# Change to "lts" in group_vars/all.yml if you would rather track LTS.
+# ===========================================================================
+
+- name: Report that the mise role is not yet implemented
+  ansible.builtin.debug:
+    msg:
+      - "SKIPPED: mise/JDK role is a stub -- scheduled for a follow-up session."
+      - "No JDK was installed."
+  tags: [mise]

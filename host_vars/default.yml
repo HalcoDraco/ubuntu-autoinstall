@@ -1,0 +1,11 @@
+---
+# ---------------------------------------------------------------------------
+# Fallback variables for a machine with no host_vars file of its own.
+#
+# local.yml loads host_vars/<hostname>.yml if it exists, otherwise this file.
+# That means a brand-new machine -- whatever you named it in the installer --
+# gets a safe, conservative configuration instead of silently doing nothing.
+#
+# Conservative here means: no GPU driver. A machine must explicitly opt in.
+# ---------------------------------------------------------------------------
+nvidia_gpu_present: false
