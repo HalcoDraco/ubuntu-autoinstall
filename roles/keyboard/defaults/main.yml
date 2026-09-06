@@ -9,3 +9,43 @@ keyboard_layouts:
   - es
 keyboard_switch_keys: ["<Super>space"]
 keyboard_switch_backward_keys: ["<Shift><Super>space"]
+
+# ---------------------------------------------------------------------------
+# The three GNOME settings this role manages.
+#
+# READ THIS BEFORE EDITING -- there is a genuine trap here.
+#
+# `value` carries an explicit GVariant TYPE ANNOTATION ("@a(ss) ", "@as ")
+# and that is NOT decoration. Without it, Ansible sees a templated string that
+# happens to be a valid Python literal:
+#     [('xkb', 'custom'), ('xkb', 'es')]
+# and helpfully converts it into a real Python list of tuples. Serialising
+# that to the module turns the tuples into arrays:
+#     [['xkb', 'custom'], ['xkb', 'es']]
+# which GNOME cannot read -- `gsettings get` then returns an empty list and
+# your input sources silently disappear.
+#
+# The leading "@" stops that conversion dead: the string no longer looks like
+# a Python literal, so it stays a string. gsettings accepts the annotated
+# form and stores the correct type. (Verified: `| type_debug` reports "list"
+# without the prefix and "str" with it.)
+#
+# For the idempotency comparison the task strips the "@..." prefix back off
+# and compares against `gsettings get` with whitespace removed. An earlier
+# attempt kept a second, unannotated copy of the value for comparing -- that
+# does not work, because Ansible converts THAT one into a list of lists and
+# the comparison never matches, so the role reported a change on every run.
+# Deriving the comparison from the annotated string avoids the problem.
+# ---------------------------------------------------------------------------
+keyboard_gsettings:
+  - schema: org.gnome.desktop.input-sources
+    key: sources
+    value: "@a(ss) [{% for l in keyboard_layouts %}('xkb', '{{ l }}'){{ ', ' if not loop.last }}{% endfor %}]"
+
+  - schema: org.gnome.desktop.wm.keybindings
+    key: switch-input-source
+    value: "@as [{% for k in keyboard_switch_keys %}'{{ k }}'{{ ', ' if not loop.last }}{% endfor %}]"
+
+  - schema: org.gnome.desktop.wm.keybindings
+    key: switch-input-source-backward
+    value: "@as [{% for k in keyboard_switch_backward_keys %}'{{ k }}'{{ ', ' if not loop.last }}{% endfor %}]"

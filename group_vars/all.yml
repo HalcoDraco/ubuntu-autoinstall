@@ -24,6 +24,7 @@
 apt_packages:
   - vlc            # the media player you asked for
   - htop           # process viewer
+  - btop           # nicer process viewer
   - tree           # directory listings
   - ripgrep        # fast grep, used by lots of editors
   - gnome-tweaks   # exposes GNOME settings the Settings app hides

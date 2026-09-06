@@ -148,6 +148,17 @@ Gotchas discovered the hard way, do not regress these:
   written and the cache never refreshed, so the package is genuinely absent
   and `make check` fails on a fresh machine. This bit us three times: chrome,
   mise, then docker's service+group tasks.
+- **GVariant values MUST carry an explicit type annotation** ("@a(ss) ",
+  "@as ") in roles/keyboard/defaults/main.yml. Without it Ansible sees a
+  templated string that is a valid Python literal, converts it to a real list,
+  and serialisation turns the tuples into arrays -- so GNOME reads
+  `[['xkb','custom']]`, cannot parse type a(ss), and the user's input sources
+  silently become EMPTY. Verified with `| type_debug`: "list" without the
+  prefix, "str" with it. This shipped and broke the host's keyboard once.
+- Do NOT use community.general.dconf for these keys, and do not keep a second
+  unannotated copy of the value for comparison -- it gets converted the same
+  way and the comparison never matches, so the role reports a change forever.
+  Derive the comparison by stripping the "@..." prefix off the real value.
 - Docker Engine alone CANNOT use the GPU. nvidia_container installs the NVIDIA
   Container Toolkit; without it `docker run --gpus all` fails. Check
   daemon.json before running nvidia-ctk -- it always exits 0 and reconfiguring

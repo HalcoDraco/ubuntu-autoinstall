@@ -77,43 +77,65 @@
   when: not keyboard_gnome_shell.stat.exists
   tags: [keyboard]
 
-# ---------------------- 2. GNOME settings (NOT root) ----------------------
-# MODULE CHOICE: community.general.dconf rather than `command: gsettings set`.
-# dconf is idempotent -- it reads the current value first and reports "ok"
-# when nothing needs changing. A `command: gsettings set` would report
-# "changed" on every run and need a hand-written changed_when to fix.
+# ---------------------- 3. GNOME settings (NOT root) ----------------------
+# MODULE CHOICE: `gsettings` via command, NOT community.general.dconf.
 #
-# Values are GVariant literals, which is why the quoting below looks fussy:
-# dconf stores typed values, not strings.
+# This one is counter-intuitive, so it is worth being precise about. The dconf
+# module looks like the right tool and was used here originally. It is not,
+# because it CORRUPTS these particular values.
+#
+# GNOME's input-sources/sources key has GVariant type a(ss) -- an array of
+# TUPLES. Ansible sends the correct text:
+#     [('xkb', 'custom'), ('xkb', 'es')]
+# but community.general 13.3.0 stores:
+#     [['xkb', 'custom'], ['xkb', 'es']]
+# -- arrays, not tuples. GNOME cannot read that, so `gsettings get` returns an
+# empty list and your input sources silently vanish. Older community.general
+# (the one Ubuntu bundles) does not do this, so it passes on a stock machine
+# and fails on one with a newer collection installed. That is the worst kind
+# of bug, and the reason we do not depend on the module at all.
+#
+# `gsettings` is GNOME's own tool. It validates against the schema, so a bad
+# value fails loudly instead of corrupting the setting silently.
+#
+# IDEMPOTENCY: `command` is not idempotent by itself, so each setting is read
+# first and only written when it differs, comparing with whitespace stripped.
+#
+# See roles/keyboard/defaults/main.yml for why the values carry an explicit
+# GVariant type annotation. That detail is load-bearing, not cosmetic.
 
-- name: Set the GNOME input sources
-  community.general.dconf:
-    key: "/org/gnome/desktop/input-sources/sources"
-    # Builds e.g.  [('xkb', 'custom'), ('xkb', 'es')]
-    # The FIRST entry is the layout you get at login.
-    value: "[{% for layout in keyboard_layouts %}('xkb', '{{ layout }}'){{ ', ' if not loop.last }}{% endfor %}]"
-    state: present
+- name: Read the current GNOME keyboard settings
+  ansible.builtin.command: "gsettings get {{ item.schema }} {{ item.key }}"
   become: false
-  # ^ MUST be false. See the header of this file and of local.yml.
+  loop: "{{ keyboard_gsettings }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: keyboard_current
+  changed_when: false     # reading changes nothing
+  check_mode: false       # safe to run during --check; it only reads
   when: keyboard_gnome_shell.stat.exists
   tags: [keyboard]
 
-- name: Bind the input-source switch shortcut
-  # Set explicitly rather than trusting the default, so a fresh machine
-  # cannot surprise you with a different binding.
-  community.general.dconf:
-    key: "/org/gnome/desktop/wm/keybindings/switch-input-source"
-    value: "{{ keyboard_switch_keys | to_json }}"
-    state: present
+- name: Apply the GNOME keyboard settings
+  # argv form avoids any shell quoting question around the GVariant literal,
+  # which contains quotes, parentheses and angle brackets.
+  ansible.builtin.command:
+    argv:
+      - gsettings
+      - set
+      - "{{ item.item.schema }}"
+      - "{{ item.item.key }}"
+      - "{{ item.item.value }}"
   become: false
-  when: keyboard_gnome_shell.stat.exists
-  tags: [keyboard]
-
-- name: Bind the reverse input-source switch shortcut
-  community.general.dconf:
-    key: "/org/gnome/desktop/wm/keybindings/switch-input-source-backward"
-    value: "{{ keyboard_switch_backward_keys | to_json }}"
-    state: present
-  become: false
-  when: keyboard_gnome_shell.stat.exists
+  loop: "{{ keyboard_current.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when:
+    - keyboard_gnome_shell.stat.exists
+    # Strip the "@a(ss) " / "@as " type prefix back off, then compare with
+    # all whitespace removed so we do not depend on gsettings and Jinja
+    # spacing their output identically.
+    - (item.stdout | default('') | trim | replace(' ', ''))
+      != (item.item.value | regex_replace('^@\\S+ ', '') | replace(' ', ''))
+  changed_when: true      # only reached when the value actually differs
   tags: [keyboard]

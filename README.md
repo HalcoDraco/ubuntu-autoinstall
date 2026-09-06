@@ -4,6 +4,10 @@ Ansible automation that takes a freshly installed Ubuntu desktop and converges i
 to my preferred state. Built to run unchanged on **Ubuntu 22.04, 24.04 and 26.04**, and to be re-run periodically on every machine rather than only
 after a reinstall.
 
+> **Just want to change something?** See **[USAGE.md](USAGE.md)** — a one-page
+> cheat sheet for adding apps, changing the keyboard and running it. This file
+> explains *why* things are the way they are.
+
 ---
 
 ## 1. Bootstrap: the one command
