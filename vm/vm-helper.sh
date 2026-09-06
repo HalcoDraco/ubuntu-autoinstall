@@ -32,8 +32,15 @@ VM_USER="${VM_USER:-pablo}"
 say() { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# SSH forwards the host's LANG/LC_* by default (/etc/ssh/ssh_config has
+# "SendEnv LANG LC_*"). The minimal cloud image has no locales installed
+# beyond C.UTF-8, so a host locale like es_ES.UTF-8 makes Ansible abort with
+# "could not initialize the preferred locale". Forcing C.UTF-8 for every
+# remote command avoids depending on what locales the guest happens to have.
 ssh_cmd() {
     ssh -p "$SSH_PORT" -i "$SSH_KEY" \
+        -o SetEnv=LC_ALL=C.UTF-8 \
+        -o SetEnv=LANG=C.UTF-8 \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
         -o LogLevel=ERROR \

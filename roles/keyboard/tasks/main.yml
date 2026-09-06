@@ -40,6 +40,43 @@
     keyboard_relogin_required: "{{ keyboard_symbols.changed }}"
   tags: [keyboard]
 
+# ---------------- 2. is there actually a GNOME desktop here? --------------
+# Found by testing in a clean VM: on a machine with no desktop (a server
+# image, a container, or a minimal install) there is no `dconf` binary and no
+# session bus, and the tasks below fail hard with
+#   "Failed to find required executable dconf".
+#
+# The symbols file above is still worth installing everywhere -- it is inert
+# until a desktop uses it -- but the GNOME settings genuinely cannot apply, so
+# we detect and skip rather than fail.
+
+- name: Detect whether this machine has a GNOME desktop
+  ansible.builtin.stat:
+    path: /usr/bin/gnome-shell
+  register: keyboard_gnome_shell
+  tags: [keyboard]
+
+- name: Install dconf-cli
+  # community.general.dconf shells out to the `dconf` binary, which lives in
+  # this package. Present on a stock Ubuntu desktop, but make it explicit so
+  # a minimal desktop install cannot fail here.
+  ansible.builtin.apt:
+    name: dconf-cli
+    state: present
+  become: true
+  when: keyboard_gnome_shell.stat.exists
+  tags: [keyboard]
+
+- name: Explain why the GNOME settings are being skipped
+  ansible.builtin.debug:
+    msg: >-
+      No GNOME desktop detected (/usr/bin/gnome-shell is absent), so the input
+      sources and keyboard shortcut were not configured. The custom layout
+      file itself WAS installed and will be picked up if a desktop is added
+      later.
+  when: not keyboard_gnome_shell.stat.exists
+  tags: [keyboard]
+
 # ---------------------- 2. GNOME settings (NOT root) ----------------------
 # MODULE CHOICE: community.general.dconf rather than `command: gsettings set`.
 # dconf is idempotent -- it reads the current value first and reports "ok"
@@ -58,6 +95,7 @@
     state: present
   become: false
   # ^ MUST be false. See the header of this file and of local.yml.
+  when: keyboard_gnome_shell.stat.exists
   tags: [keyboard]
 
 - name: Bind the input-source switch shortcut
@@ -68,6 +106,7 @@
     value: "{{ keyboard_switch_keys | to_json }}"
     state: present
   become: false
+  when: keyboard_gnome_shell.stat.exists
   tags: [keyboard]
 
 - name: Bind the reverse input-source switch shortcut
@@ -76,4 +115,5 @@
     value: "{{ keyboard_switch_backward_keys | to_json }}"
     state: present
   become: false
+  when: keyboard_gnome_shell.stat.exists
   tags: [keyboard]

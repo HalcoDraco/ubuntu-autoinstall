@@ -1,8 +1,7 @@
 # ubuntu-autoinstall
 
 Ansible automation that takes a freshly installed Ubuntu desktop and converges it
-to my preferred state. Built to run unchanged on **Ubuntu 24.04 (noble) today and
-26.04 later**, and to be re-run periodically on every machine rather than only
+to my preferred state. Built to run unchanged on **Ubuntu 22.04, 24.04 and 26.04**, and to be re-run periodically on every machine rather than only
 after a reinstall.
 
 ---
@@ -172,7 +171,24 @@ Hard rules for this repo. Breaking one is how it rots on the next release.
 | Codenames | `suites: "{{ ansible_distribution_release }}"` | `suites: noble` |
 | Package names | `openjdk` via mise, `default-jdk` | `openjdk-25-jdk` |
 | Repos | Official upstream apt repos | PPAs — they break across upgrades |
+| Ansible features | Only what 22.04's ansible 2.10 has | `deb822_repository` (needs core 2.15+, absent on 22.04) |
 | Release-specific work | `when: ansible_distribution_version is version('26.04', '>=')` | Assuming a release |
+
+### Why repo files are written with `template`
+
+Ansible has a purpose-built module for apt repositories, and this repo uses
+neither of the two options:
+
+- `apt_repository` writes the **deprecated one-line format** that APT 3
+  (26.04) warns about.
+- `deb822_repository` writes the modern format but **needs ansible-core
+  2.15+**. Ubuntu 22.04 ships ansible 2.10, so the module does not exist
+  there and the role would fail outright.
+
+A `template` has neither problem: it produces the modern deb822 format on
+every Ansible version from 22.04's through 26.04's. Idempotency is unaffected
+— `template` compares checksums, so it is a no-op when the file already
+matches.
 
 Three of the four repos used here (Chrome, mise, Spotify's snap) have **no
 codename at all** — they publish a single `stable` suite for every Ubuntu
@@ -185,7 +201,7 @@ why it is written as the fact and never as a literal.
 |---|---|---|
 | **Wayland-only** | `setxkbmap`/`xkbcomp` do not work at all | All desktop config goes through gsettings/dconf. Neither tool appears anywhere in this repo. |
 | **GNOME 50** | dconf schema paths are stable across versions | No change needed |
-| **APT 3** | one-line `.list` sources deprecated | `deb822_repository` everywhere, never `apt_repository` |
+| **APT 3** | one-line `.list` sources deprecated | Repo files written as modern `.sources` (deb822) via `template` |
 | **Snap prompting on** | first launch of a confined snap shows a dialog | Cannot be scripted; on the manual-steps checklist, printed only when running on 26.04+ |
 
 This machine is **already on Wayland** under 24.04, so the keyboard constraint
@@ -279,7 +295,7 @@ untestable. It would only cover the apt layer.
 | `base` | `base` | **Done** — python3/pip/venv, apt cache, essentials |
 | `packages` | `packages`, `apt`, `snap` | **Done** — the user-editable lists (VLC, Spotify) |
 | `chrome` | `chrome` | **Done** — Google's repo + the `repo_add_once` fix |
-| `keyboard` | `keyboard` | **Scaffolded** — working placeholder layout, real mappings TODO |
+| `keyboard` | `keyboard` | **Done** — your 14 real key mappings, compile-verified |
 | `manual_steps` | `manual_steps` | **Done** — prints the checklist |
 | `docker` | `docker` | Stub — next session |
 | `nvidia` | `nvidia` | Stub — next session |
@@ -300,11 +316,24 @@ package owns that path, **package updates cannot overwrite it** — which is the
 whole point, and why editing `symbols/us` was getting clobbered on every
 update.
 
-`roles/keyboard/files/custom` currently holds a working placeholder: `us(basic)`
-plus `level3(ralt_switch)` (making right-Alt act as AltGr) and one mapping,
-AltGr+`;` = `ñ`. The file has a clear `TODO` block explaining how to add the
-rest — keycodes, keysym names, and how to find both. Dropping the real mappings
-in requires no restructuring.
+`roles/keyboard/files/custom` holds **your real mappings**, recovered by
+diffing your hand-edited `symbols/us` against the pristine file from the
+`xkb-data` package, and verified to compile with `xkbcomp`:
+
+| AltGr + | gives | | AltGr + | gives |
+|---|---|---|---|---|
+| `a` `e` `i` `o` `u` | á é í ó ú | | `;` | ñ |
+| `\` | ç | | `1` | ¡ |
+| `/` | ¿ | | `3` | · |
+| `` ` `` | º / ª | | `d` | € |
+| `[` | grave dead key | | `'` | diaeresis dead key (ü) |
+
+Shift+AltGr gives the capital: Á É Í Ó Ú Ñ Ç.
+
+One correction to the original: your `symbols/us` edit never included
+`level3(ralt_switch)`, so right-Alt only worked as AltGr because the Spanish
+layout — loaded as your second input source — happened to provide it. The new
+file declares it itself, so the layout works even on its own.
 
 > After changing the layout you **must log out and back in**. GNOME compiles
 > the keymap when your session starts; there is no supported way to force that

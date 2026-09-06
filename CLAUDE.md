@@ -6,7 +6,7 @@ how the repo rots on the next Ubuntu release.
 ## What this repo is
 
 Ansible automation that converges a fresh Ubuntu **desktop** to Pablo's
-preferred state. Must run unchanged on **24.04 (noble) today and 26.04 later**.
+preferred state. Must run unchanged on **Ubuntu 22.04, 24.04 and 26.04**.
 Runs on a desktop (NVIDIA GPU) and a laptop (no GPU). Re-run periodically to
 converge, not just after a reinstall.
 
@@ -25,8 +25,13 @@ briefly why in a comment — that is an explicit requirement, not a nicety.
 5. **No X11 tools, ever.** No `setxkbmap`, no `xkbcomp`, no `xdotool`. 26.04 is
    Wayland-only and this machine is already on Wayland. Desktop config goes
    through **gsettings/dconf** exclusively.
-6. **`deb822_repository`, never `apt_repository`.** The latter writes the
-   deprecated one-line format that APT 3 warns about.
+6. **Write apt repo files with `template`, not with a repository module.**
+   `apt_repository` writes the deprecated one-line format APT 3 warns about;
+   `deb822_repository` needs ansible-core 2.15+ and **does not exist on 22.04**
+   (which ships ansible 2.10). A template produces the modern deb822 `.sources`
+   format on every version. Do not "modernise" this back to a module.
+6b. **Use only Ansible features present in 2.10.** That is the floor set by
+   22.04. Check before using anything newer.
 7. **Do not touch Firefox.** Not installing, not removing, not configuring.
    The user changed their mind on this; leave it alone entirely.
 8. **Ubuntu only.** Distro-agnosticism is explicitly *not* wanted — but keep
@@ -122,6 +127,10 @@ Runtime uses the system Ansible that `bootstrap.sh` installs.
 Done: `base`, `packages`, `chrome`, `manual_steps`. Scaffolded: `keyboard`
 (working placeholder layout; real mappings pending from the user).
 Stubs awaiting implementation: `docker`, `nvidia`, `mise`.
+
+The keyboard layout now contains the user's REAL 14 key mappings, recovered by
+diffing their hand-edited `/usr/share/X11/xkb/symbols/us` against the pristine
+file from the `xkb-data` package, and verified to compile with `xkbcomp`.
 
 For `docker`, the plan is **hand-rolled rather than `geerlingguy.docker`** —
 that role carries multi-distro branching we do not need and Ubuntu-version

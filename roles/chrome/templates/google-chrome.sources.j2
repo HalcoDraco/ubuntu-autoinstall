@@ -1,0 +1,11 @@
+# Managed by ubuntu-autoinstall (roles/chrome). Do not edit by hand.
+#
+# This is APT's "deb822" format -- the modern replacement for the old
+# one-line "deb [signed-by=...] http://... stable main" style, which APT 3
+# (Ubuntu 26.04) deprecates.
+Types: deb
+URIs: {{ chrome_repo_uri }}
+Suites: {{ chrome_repo_suite }}
+Components: {{ chrome_repo_component }}
+Architectures: amd64
+Signed-By: {{ chrome_keyring_path }}

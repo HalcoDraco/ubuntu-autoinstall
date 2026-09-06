@@ -61,31 +61,42 @@
   tags: [chrome]
 
 - name: Add the Google Chrome apt repository
-  # MODULE CHOICE: deb822_repository, not apt_repository.
+  # MODULE CHOICE: template, not deb822_repository and not apt_repository.
   #
-  # apt_repository writes the old one-line format:
-  #     deb [signed-by=...] https://... stable main
-  # which is deprecated and which APT 3 (Ubuntu 26.04) warns about.
+  # This looks like the wrong tool at first glance -- Ansible HAS a module for
+  # apt repositories. Here is why we write the file ourselves anyway:
   #
-  # deb822_repository writes the modern .sources format that your machine
-  # already uses for docker and chrome, and it takes each field as a proper
-  # parameter instead of making us build a string by concatenation. For repos
-  # that DO need a codename, that means writing
-  #     suites: "{{ ansible_distribution_release }}"
-  # rather than splicing it into a line -- which is the mechanism that keeps
-  # this repo version-agnostic.
-  ansible.builtin.deb822_repository:
-    name: google-chrome          # -> /etc/apt/sources.list.d/google-chrome.sources
-    types: [deb]
-    uris: "{{ chrome_repo_uri }}"
-    suites: "{{ chrome_repo_suite }}"
-    components: "{{ chrome_repo_component }}"
-    architectures: [amd64]       # Google ships amd64 only for Chrome on Linux
-    signed_by: "{{ chrome_keyring_path }}"
-    enabled: true
-    state: present
+  #   * apt_repository writes the deprecated one-line format that APT 3
+  #     (Ubuntu 26.04) warns about. Ruled out.
+  #   * deb822_repository writes the modern format, but it requires
+  #     ansible-core 2.15+. Ubuntu 22.04 ships ansible 2.10, so that module
+  #     does not exist there and this role would fail outright on 22.04.
+  #
+  # A template has neither problem: it produces the modern deb822 format on
+  # EVERY Ansible version, from 22.04's 2.10 through 26.04's. Since this repo
+  # must survive Ubuntu upgrades, portability across the Ansible that each
+  # release happens to ship matters more than using the purpose-built module.
+  #
+  # We lose nothing on idempotency: template compares checksums, so it is a
+  # no-op when the file already matches.
+  ansible.builtin.template:
+    src: google-chrome.sources.j2
+    dest: /etc/apt/sources.list.d/google-chrome.sources
+    owner: root
+    group: root
+    mode: "0644"
   become: true
   register: chrome_repo
+  tags: [chrome]
+
+- name: Remove any legacy one-line Chrome source
+  # If Chrome's postinst ever ran before we set repo_add_once=false, it left a
+  # google-chrome.list behind. Having both that and our .sources file makes
+  # apt warn about a duplicate repository on every update.
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/google-chrome.list
+    state: absent
+  become: true
   tags: [chrome]
 
 - name: Install Google Chrome

@@ -1,67 +1,65 @@
 // ===========================================================================
 // /usr/share/X11/xkb/symbols/custom
 //
-// A US layout with AltGr mappings for Spanish characters.
+// US layout + AltGr (right-Alt) mappings for Spanish characters.
 //
-// WHY THIS FILE IS CALLED "custom":
-// xkeyboard-config RESERVES the layout name "custom". It is listed in
-// /usr/share/X11/xkb/rules/evdev.xml as "A user-defined custom Layout", but
-// the package deliberately ships NO symbols file for it. That means this file
-// is yours: package updates never overwrite it, because no package owns it.
+// These mappings were recovered from the hand-edited
+// /usr/share/X11/xkb/symbols/us on Niaura-linux, by diffing it against the
+// pristine file from the xkb-data package. All 14 customised keys are here.
 //
-// This is why you must not edit symbols/us -- that file IS owned by
-// xkeyboard-config and gets clobbered on every update.
+// WHY THIS FILE IS NAMED "custom":
+// xkeyboard-config RESERVES the layout name "custom": it is listed in
+// evdev.xml as "A user-defined custom Layout", but the package deliberately
+// ships no symbols file for it. No package owns this path, so package updates
+// CANNOT overwrite it.
 //
-// ---------------------------------------------------------------------------
-// TODO: REPLACE THE MAPPINGS BELOW WITH THE REAL ONES.
-//
-// The single ntilde mapping is a working placeholder so the layout is valid
-// and selectable today. Add further keys inside the xkb_symbols block using
-// the same pattern:
-//
-//     key <KEYCODE> {
-//         type[Group1] = "FOUR_LEVEL_SEMIALPHABETIC",
-//         [ plain, shifted, altgr, altgr_shifted ]
-//     };
-//
-// Useful keycodes on a US layout:
-//   <AD01>..<AD10>  the QWERTYUIOP row
-//   <AC01>..<AC11>  the ASDFGHJKL;' row
-//   <AB01>..<AB10>  the ZXCVBNM,./ row
-//   <AE01>..<AE12>  the number row
-//
-// Find a key's code with:   xev -event keyboard    (or `wev` on Wayland)
-// Find a character's name:  look it up in /usr/include/X11/keysymdef.h
-//                           (strip the leading XK_ ; e.g. XK_ntilde -> ntilde)
-//
-// After editing, apply with:  ansible-playbook local.yml -K --tags keyboard
-// then LOG OUT AND BACK IN -- see the manual steps the playbook prints.
-// ---------------------------------------------------------------------------
+// That is the fix for the actual problem: editing symbols/us worked, but that
+// file belongs to the xkb-data package and gets replaced on every update --
+// which is why the mappings kept disappearing.
+// ===========================================================================
 
-default partial alphanumeric_keys
+default partial alphanumeric_keys modifier_keys
 xkb_symbols "basic" {
 
-    // Start from the standard US layout and change only what we need.
+    // Start from the stock US layout, then override only the 14 keys below.
+    // Because we only override, any future improvement upstream makes to the
+    // US layout is inherited automatically.
     include "us(basic)"
 
-    // Make the RIGHT Alt key act as AltGr (the "level 3" shift).
-    // Without this line the third and fourth entries in each key definition
-    // below are unreachable.
+    // Make RIGHT Alt act as AltGr (the "level 3" shift). Without this, the
+    // third and fourth entries on each key below are unreachable.
+    //
+    // The old symbols/us edit did NOT include this -- it worked only because
+    // the Spanish layout, loaded as the second group, happened to provide it.
+    // Declaring it here makes this layout self-contained and correct even if
+    // it is the only layout installed.
     include "level3(ralt_switch)"
 
-    name[Group1] = "English (custom, Spanish AltGr)";
+    name[Group1] = "English (US, Spanish AltGr)";
 
-    // ---- Spanish characters -------------------------------------------
-    // AltGr + ;  ->  n-tilde
-    // The four values are: [ plain, Shift, AltGr, AltGr+Shift ]
-    //
-    // FOUR_LEVEL_SEMIALPHABETIC is the key type that makes Caps Lock behave
-    // sensibly for the letter-producing levels while leaving the punctuation
-    // levels alone. Using the default type here would make AltGr+; dead.
-    key <AC10> {
-        type[Group1] = "FOUR_LEVEL_SEMIALPHABETIC",
-        [ semicolon, colon, ntilde, Ntilde ]
-    };
+    // Each key lists:  [ plain, Shift, AltGr, AltGr+Shift ]
 
-    // TODO: add the remaining mappings here.
+    // --- accented vowels -------------------------------------------------
+    key <AC01> {[         a,          A,     aacute,     Aacute ]};  // AltGr+a
+    key <AD03> {[         e,          E,     eacute,     Eacute ]};  // AltGr+e
+    key <AD08> {[         i,          I,     iacute,     Iacute ]};  // AltGr+i
+    key <AD09> {[         o,          O,     oacute,     Oacute ]};  // AltGr+o
+    key <AD07> {[         u,          U,     uacute,     Uacute ]};  // AltGr+u
+
+    // --- Spanish letters --------------------------------------------------
+    key <AC10> {[ semicolon,      colon,     ntilde,     Ntilde ]};  // AltGr+;  -> n-tilde
+    key <BKSL> {[ backslash,        bar,   ccedilla,   Ccedilla ]};  // AltGr+\  -> c-cedilla
+
+    // --- Spanish punctuation ---------------------------------------------
+    key <AE01> {[         1,     exclam, exclamdown             ]};  // AltGr+1  -> inverted !
+    key <AB10> {[     slash,   question, questiondown           ]};  // AltGr+/  -> inverted ?
+    key <AE03> {[         3, numbersign, periodcentered         ]};  // AltGr+3  -> middle dot
+    key <TLDE> {[     grave, asciitilde,  masculine, ordfeminine ]}; // AltGr+`  -> masculine/feminine ordinals
+
+    // --- dead keys (press, then a vowel) ----------------------------------
+    key <AD11> {[ bracketleft,  braceleft,  dead_grave          ]};  // AltGr+[  -> grave accent
+    key <AC11> {[ apostrophe,    quotedbl, dead_diaeresis       ]};  // AltGr+'  -> diaeresis (u-umlaut)
+
+    // --- currency ----------------------------------------------------------
+    key <AC03> {[         d,          D,   EuroSign             ]};  // AltGr+d  -> euro
 };
