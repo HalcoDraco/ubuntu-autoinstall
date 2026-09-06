@@ -210,10 +210,13 @@ codename at all** — they publish a single `stable` suite for every Ubuntu
 release, so they cannot rot. Docker's does need the codename, which is exactly
 why it is written as the fact and never as a literal.
 
-> **Verified on 26.04.** The playbook has been run against a real Ubuntu
-> 26.04 "Resolute Raccoon" VM (APT 3.2.0, ansible-core 2.20.1): it completes
-> with zero failures, and the snap-prompting checklist entry correctly appears
-> there while staying hidden on 24.04.
+> **Verified on 26.04, end to end.** Bootstrapped on a genuinely fresh Ubuntu
+> 26.04 "Resolute Raccoon" VM — no ansible, no make, only git, exactly as
+> after a clean install — with GNOME Shell 50.1 on Wayland and APT 3.2.0.
+> `./bootstrap.sh` installs Ansible itself and completes with zero failures;
+> runs 2 and 3 report `changed=0`. Verified afterwards on the guest: input
+> sources `[('xkb', 'custom'), ('xkb', 'es')]`, Java 27, Docker 29.8.0 running
+> a container, Chrome, VLC/btop/htop, Spotify, and `apt update` clean.
 
 ### What is different about 26.04, and how it is handled
 
