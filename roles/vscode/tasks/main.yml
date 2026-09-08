@@ -1,0 +1,154 @@
+---
+# ===========================================================================
+# vscode -- Visual Studio Code from Microsoft's own APT repository.
+#
+# WHY A ROLE AND NOT A LINE IN apt_packages:
+# Same test as Chrome. VS Code is not in Ubuntu's repositories; it needs a
+# third-party repo and a signing key, which is real logic. A plain package
+# name would go in group_vars/all.yml instead (that is where VLC lives).
+#
+# WHY APT AND NOT THE SNAP:
+# There is a `code` snap (--classic), and snap_packages_classic in
+# group_vars/all.yml would have been a one-line change. Apt won because that
+# is how VS Code is actually installed on your machine today, so a fresh
+# install now matches it, and because the apt build integrates with the
+# system it runs on -- no classic-confinement quirks and no snap permission
+# prompting (which 26.04 turns on by default).
+#
+# THE IDEMPOTENCY TRAP -- worse than Chrome's, and this cost a VM test to pin
+# down. The `code` package manages its own apt source file, in BOTH
+# directions:
+#
+#   * code.postrm  DELETES /etc/apt/sources.list.d/vscode.sources. Not only
+#     on purge -- on every remove AND every upgrade.
+#   * code.postinst then WRITES its own copy of that file.
+#
+# So on each upgrade of `code` (a weekly package) the pair runs in sequence:
+# postrm deletes our file, postinst finds nothing pointing at the Microsoft
+# repo and writes its own version -- with a different Signed-By and without
+# our header. The template below would flip it back on the next run, and this
+# role would report "changed" forever. Chrome's answer, an opt-out file with
+# repo_add_once="false", has no equivalent here.
+#
+# Writing our file before the install is NOT enough. It defeats the postinst
+# on a FIRST install (the postinst skips writing if any file already points
+# at the repo) but nothing stops the postrm on the next upgrade. Verified in
+# a 26.04 VM: `apt reinstall code` wiped our file every time.
+#
+# WHAT ACTUALLY WORKS is the package's own debconf question. Both scripts are
+# wrapped in a check of code/add-microsoft-repo, so answering "false" turns
+# off the delete and the write together. That is Microsoft's supported
+# opt-out and it is the real equivalent of repo_add_once.
+# ===========================================================================
+
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+  tags: [vscode]
+
+- name: Fetch Microsoft's package signing key
+  ansible.builtin.get_url:
+    url: "{{ vscode_signing_key_url }}"
+    dest: "{{ vscode_keyring_path }}"
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  # Same reasoning as the chrome role: get_url with the default force=false
+  # issues a conditional request and only reports "changed" if the key really
+  # changed upstream.
+  #
+  # We fetch the key ourselves rather than pointing Signed-By at the
+  # /usr/share/keyrings/microsoft.gpg the package installs, and with the
+  # debconf answer set below the package never installs that file at all --
+  # so relying on it would leave apt with no key. It is the same key either
+  # way: fingerprint BC52 8686 B50D 79E3 39D3 721C EB3E 94AD BE12 29CF,
+  # verified against the copy already on the working machine.
+  tags: [vscode]
+
+- name: Tell the VS Code package not to manage its own apt source
+  # THIS IS THE TASK THAT MAKES THE ROLE IDEMPOTENT. See the header comment.
+  # Answering the package's debconf question "false" stops code.postrm from
+  # deleting the source file on upgrade and code.postinst from writing its
+  # own. Without it this role reports "changed" after every `apt upgrade`
+  # that includes VS Code.
+  #
+  # Must come BEFORE the install, so a first install never writes a second
+  # copy of the repo.
+  #
+  # No extra packages needed: the module drives debconf-show and
+  # debconf-set-selections, both from `debconf` itself, which is essential
+  # and present on every Ubuntu. It is also idempotent -- it reads the
+  # current answer first and only reports "changed" when it differs.
+  ansible.builtin.debconf:
+    name: code
+    question: code/add-microsoft-repo
+    vtype: boolean
+    value: "false"
+  become: true
+  tags: [vscode]
+
+- name: Add the Visual Studio Code apt repository
+  # MODULE CHOICE: template, not deb822_repository and not apt_repository.
+  # The reasoning is spelled out in full in roles/chrome/tasks/main.yml --
+  # short version: apt_repository writes the format APT 3 deprecates, and
+  # deb822_repository does not exist on 22.04's ansible 2.10. A template
+  # produces the modern deb822 format on every Ansible version.
+  #
+  # The file deliberately takes the name the package itself would use, so apt
+  # can never end up with two sources for the same repo.
+  ansible.builtin.template:
+    src: vscode.sources.j2
+    dest: /etc/apt/sources.list.d/vscode.sources
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  register: vscode_repo
+  tags: [vscode]
+
+- name: Remove any legacy one-line VS Code source
+  # Older versions of the package wrote /etc/apt/sources.list.d/vscode.list
+  # in the deprecated one-line format. Leaving it next to our .sources file
+  # makes apt warn about a duplicate repository on every update.
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/vscode.list
+    state: absent
+  become: true
+  tags: [vscode]
+
+- name: Install Visual Studio Code
+  ansible.builtin.apt:
+    name: "{{ vscode_package }}"
+    state: present
+    # NOTE: recommends are left ON here, unlike the chrome role.
+    # `code` recommends bubblewrap, libvulkan1 and socat -- its sandbox, its
+    # GPU acceleration and its remote/tunnel support. All three are installed
+    # on the working machine, so a fresh install should get them too.
+    # Refresh the package index only when the repo definition just changed.
+    update_cache: "{{ vscode_repo.changed }}"
+  become: true
+  # CHECK-MODE ARTEFACT, not a real problem -- identical to chrome and mise:
+  # in --check the repo file above was not actually written and apt's cache
+  # was not refreshed, so the package genuinely is not in the cache yet and
+  # apt fails with "No package matching". Skip it during a dry run on a
+  # machine that does not have the repo yet, and say so, rather than letting
+  # `make check` fail on a fresh machine.
+  when: not (ansible_check_mode and vscode_repo.changed)
+  tags: [vscode]
+
+- name: Note that VS Code's install was skipped in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Dry run: this run would add or modify the VS Code repo file, and
+      --check never actually writes it or refreshes apt's cache. So the
+      package cannot be checked against it here. A real run writes the repo
+      first, then installs normally. (If VS Code is already installed, a real
+      run leaves it alone -- state: present never upgrades.)
+  when: ansible_check_mode and vscode_repo.changed
+  tags: [vscode]

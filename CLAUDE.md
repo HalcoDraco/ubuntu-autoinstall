@@ -130,8 +130,8 @@ Runtime uses the system Ansible that `bootstrap.sh` installs.
 
 ## Current status
 
-All roles implemented: `base`, `packages`, `chrome`, `docker`, `nvidia`,
-`nvidia_container`, `mise`, `keyboard`, `manual_steps`.
+All roles implemented: `base`, `packages`, `chrome`, `vscode`, `docker`,
+`nvidia`, `nvidia_container`, `mise`, `keyboard`, `manual_steps`.
 
 Gotchas discovered the hard way, do not regress these:
 - Inside a `>-` folded YAML scalar, `#` is literal text, NOT a comment.
@@ -172,6 +172,23 @@ Gotchas discovered the hard way, do not regress these:
   broke a real machine. Use `./vm/vm-helper.sh require-password` then
   `bootstrap -e ansible_become_password=testpw123`, and
   `allow-passwordless` to restore.
+- The `code` package fights you for /etc/apt/sources.list.d/vscode.sources
+  from BOTH sides, and only one fix works. code.postrm DELETES that file on
+  every remove AND every upgrade (not just purge); code.postinst then writes
+  its own copy. On each weekly `code` upgrade the pair runs in sequence and
+  our file is replaced, so the role would report `changed` forever.
+  Writing the file before the install is NOT enough -- it only defeats the
+  postinst on a first install, and nothing stops the postrm afterwards.
+  Verified in a 26.04 VM: `apt reinstall code` wiped it every time.
+  THE FIX is the package's own debconf question, which guards both scripts:
+      ansible.builtin.debconf: name=code question=code/add-microsoft-repo
+                               vtype=boolean value=false
+  With it answered false, postrm does not delete and postinst does not write
+  (nor does it install /usr/share/keyrings/microsoft.gpg -- which is why
+  roles/vscode fetches its own key to /etc/apt/keyrings/microsoft.asc rather
+  than pointing Signed-By at the package's copy). Needs no extra packages:
+  debconf-show and debconf-set-selections both ship in essential `debconf`,
+  NOT in debconf-utils as the module docs imply.
 - Docker Engine alone CANNOT use the GPU. nvidia_container installs the NVIDIA
   Container Toolkit; without it `docker run --gpus all` fails. Check
   daemon.json before running nvidia-ctk -- it always exits 0 and reconfiguring

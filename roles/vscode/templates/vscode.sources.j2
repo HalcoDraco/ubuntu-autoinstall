@@ -1,0 +1,14 @@
+# Managed by ubuntu-autoinstall (roles/vscode). Do not edit by hand.
+#
+# This is APT's "deb822" format -- the modern replacement for the old
+# one-line "deb [signed-by=...] http://... stable main" style, which APT 3
+# (Ubuntu 26.04) deprecates.
+#
+# This file deliberately uses the SAME NAME the `code` package would use for
+# its own copy. See roles/vscode/tasks/main.yml for why that matters.
+Types: deb
+URIs: {{ vscode_repo_uri }}
+Suites: {{ vscode_repo_suite }}
+Components: {{ vscode_repo_component }}
+Architectures: {{ vscode_repo_architectures }}
+Signed-By: {{ vscode_keyring_path }}

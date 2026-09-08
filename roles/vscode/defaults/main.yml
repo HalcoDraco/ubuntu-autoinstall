@@ -1,0 +1,24 @@
+---
+# Microsoft's APT repository for Visual Studio Code.
+#
+# Note there is no Ubuntu codename anywhere in here. Microsoft publishes a
+# single "stable" suite that serves every Debian and Ubuntu release, so this
+# repo definition is version-agnostic by construction and will not rot when
+# you move to 26.04 -- exactly like Google's Chrome repo.
+vscode_repo_uri: "https://packages.microsoft.com/repos/code"
+vscode_repo_suite: "stable"
+vscode_repo_component: "main"
+
+# Microsoft signs every one of its Linux repos with this single key, so the
+# URL has no product or release in it either.
+vscode_signing_key_url: "https://packages.microsoft.com/keys/microsoft.asc"
+vscode_keyring_path: "/etc/apt/keyrings/microsoft.asc"
+
+# The package is called plainly "code" -- no version in the name, so it does
+# not violate the "never hardcode a versioned package name" rule.
+vscode_package: "code"
+
+# Only amd64 is listed, matching the chrome role. Microsoft also publishes
+# arm64 and armhf; if you ever run this on an ARM machine, change this one
+# line (or override it in host_vars/) rather than editing the template.
+vscode_repo_architectures: "amd64"

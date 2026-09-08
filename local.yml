@@ -175,6 +175,10 @@
       tags: [chrome]
       when: install_chrome | bool
 
+    - role: vscode
+      tags: [vscode]
+      when: install_vscode | bool
+
     - role: docker
       tags: [docker]
       when: install_docker | bool

@@ -46,7 +46,11 @@ snap_packages:
   - spotify        # the music player you asked for
 
 snap_packages_classic: []
-  # - code         # example: VS Code needs --classic
+  # Example of the shape, if you ever add a classic snap:
+  #   - some-editor
+  # NOTE: VS Code is deliberately NOT here. It is installed from Microsoft's
+  # apt repo by roles/vscode, which is how it is installed on your machines
+  # today. See that role for why apt beat the snap.
 
 # ---------------------------------------------------------------------------
 # FEATURE TOGGLES
@@ -54,6 +58,9 @@ snap_packages_classic: []
 # ---------------------------------------------------------------------------
 install_chrome: true
 install_docker: true
+
+# Visual Studio Code, from Microsoft's apt repo (not the snap).
+install_vscode: true
 
 # Lets Docker use the GPU (`docker run --gpus all ...`). Only takes effect on
 # a machine that has BOTH docker and an NVIDIA GPU, so it is safe to leave on

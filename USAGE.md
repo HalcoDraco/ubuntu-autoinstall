@@ -69,6 +69,7 @@ In `group_vars/all.yml` (everywhere) or `host_vars/<hostname>.yml` (one machine)
 
 ```yaml
 install_chrome: false
+install_vscode: false          # visual studio code
 install_docker: false
 install_mise: false            # java
 install_nvidia_container: false  # gpu in docker
@@ -137,8 +138,8 @@ No file? It falls back to `host_vars/default.yml`, which is empty — so
 make run-tags TAGS=docker
 ```
 
-Tags: `base` `packages` `chrome` `docker` `nvidia` `nvidia_container`
-`mise` `keyboard` `manual_steps`
+Tags: `base` `packages` `chrome` `vscode` `docker` `nvidia`
+`nvidia_container` `mise` `keyboard` `manual_steps`
 
 ---
 

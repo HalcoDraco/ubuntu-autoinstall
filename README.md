@@ -318,6 +318,7 @@ untestable. It would only cover the apt layer.
 | `base` | `base` | **Done** — python3/pip/venv, apt cache, essentials |
 | `packages` | `packages`, `apt`, `snap` | **Done** — the user-editable lists (VLC, Spotify) |
 | `chrome` | `chrome` | **Done** — Google's repo + the `repo_add_once` fix |
+| `vscode` | `vscode` | **Done** — Microsoft's repo + the `code/add-microsoft-repo` debconf fix |
 | `keyboard` | `keyboard` | **Done** — your 14 real key mappings, compile-verified |
 | `manual_steps` | `manual_steps` | **Done** — prints the checklist |
 | `docker` | `docker` | **Done** — Docker Engine from Docker's repo, user added to `docker` group |
@@ -483,6 +484,10 @@ the repo also works with a bare `ansible-core`.
 
 **"apt reports a duplicate source for Chrome."** You have both a legacy
 `google-chrome.list` and the managed `.sources`. Delete the `.list`.
+
+**"apt reports a duplicate source for VS Code."** Same shape: a legacy
+`vscode.list` next to the managed `vscode.sources`. The role deletes the
+`.list` for you, so this should not survive one run.
 
 **A task reports `changed` every run.** That is a bug — file it. It usually
 means a `command:` without `changed_when:`, or a package rewriting a file
